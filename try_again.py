@@ -2,6 +2,7 @@ import csv
 from cvxopt.modeling import variable, op, matrix
 from cvxopt.glpk import ilp
 from numpy import array
+from operator import itemgetter
 
 # Reading data
 with open('model.csv', 'r') as f:
@@ -35,6 +36,8 @@ for model in dict_model:
 for product in products:
     product[0] = int(product[0])
     product[2] = float(product[2])
+
+products.sort(key=itemgetter(0))
 
 for i in range(0, len(channels)):
     channels[i] = channels[i][0]
@@ -118,3 +121,4 @@ for i in range(0, len(model)):
 # solution
 
 f = 0
+
