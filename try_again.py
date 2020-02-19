@@ -77,14 +77,6 @@ def product_by_model(model_code):
 
 # Preparing data
 
-# TODO: remove this step. better do this in model
-# 1. append each score with it's expectation
-
-for score in scores:
-    probability = score[2]
-    profit = profit_by_model(score[1])
-    score.append(probability * profit)
-
 print("Scores ({} items):".format(len(scores)), scores[:3], "...")
 
 # 2. Creating model
@@ -97,7 +89,6 @@ for channel in channels:
         # And here I tried dict()
         model[channels.index(channel)][products.index(product)] = dict()
 
-
 # 3. Filling model
 for score in scores:
     this_client = score[0]
@@ -107,7 +98,7 @@ for score in scores:
     this_channel = channel_by_model(this_model)
     this_product = product_by_model(this_model)
 
-    model[this_channel][this_product][this_client] = this_probability
+    model[this_channel][this_product][this_client] = this_probability * products[this_product][2]
 
 print('\nMODEL')
 # maybe better tree?
@@ -116,9 +107,31 @@ for i in range(0, len(model)):
     for j in range(0, len(model[i])):
         print('\t{}:'.format(products[j]))
         for key, value in dict(model[i][j]).items():
-            print('\t\t{}: {}'.format(key, value))
+            print('\t\tcustomer {}: {}'.format(key, value))
 
 # solution
 
+x = []  # variables
+
+for i in range(0, len(model)):
+    x.append(list())
+    for j in range(0, len(model[i])):
+        x[i].append(list())
+        size = len(dict(model[i][j]).keys())  # size of new variable vector
+        x[i][j] = variable(151, 'x{}{}'.format(i, j))
+
 f = 0
 
+for i in range(0, len(model)):
+    for j in range(0, len(model[i])):
+        for k in dict(model[i][j]).keys():
+            f += model[i][j][k] * x[i][j][k]
+
+# output
+
+print('\nOUTPUT')
+print('channel | product | client | x')
+
+# for out in output:
+#     out[2] = required x
+#     print("%6d | %5d | %d" % (out[0], out[1], out[2]))
