@@ -180,9 +180,10 @@ for p in range(len(model_1d)):
     i, j, k = ijk(model, p)
     table.add_row([p, i, j, k, c[p], x[p]])
 
+#print(table.get_string(sort_key=operator.itemgetter(5, 4), sortby="Expectation")) # just for me to explore, doesn't work btw
 print(table)
 
-print('\n' + 'CHECK CONSTRAINTS')
+print('\n' + 'CHECKING CONSTRAINTS')
 
 check = []
 for ch in channels:
