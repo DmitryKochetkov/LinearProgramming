@@ -170,6 +170,11 @@ h = matrix(np.array([10, 50, 100, 20], dtype=float))
 
 B = set(range(len(model_1d)))
 
+print('Sizes')
+print('c:', c.size)
+print('G:', G.size)
+print('h:', h.size)
+
 status, x = ilp(c, G, h, None, None, set(), B)
 
 # Output

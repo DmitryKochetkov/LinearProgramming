@@ -5,7 +5,7 @@ import numpy as np
 from operator import itemgetter
 import operator
 from prettytable import PrettyTable
-from datetime import datetime
+from datetime import datetime, date
 
 # Reading data
 with open('model.csv', 'r') as f:
@@ -154,7 +154,6 @@ print('Total clients in Hist:', len(clients_hist))
 if len(clients_scores.intersection(clients_hist)) == 0:
     print('Warning: intersection is an empty set')
 
-
 # 1. Creating model[]
 model = []
 
@@ -183,7 +182,7 @@ print("Normalized hist:")
 
 normalized_len = 0
 for i in range(len(hist)):
-    if hist[i][0] == len_customers - 1 and hist[i+1][0] == len_customers:
+    if hist[i][0] == len_customers - 1 and hist[i + 1][0] == len_customers:
         normalized_len = i
 
 hist = hist[:normalized_len]
@@ -210,8 +209,17 @@ for item in hist:
     this_channel = item[2]
     this_product = item[3] - 1
 
-    if dates[this_channel][this_product][this_client] == 0 or (this_date > dates[this_channel][this_product][this_client] and this_date < start_date):
+    if dates[this_channel][this_product][this_client] == 0 or (
+            this_date > dates[this_channel][this_product][this_client] and this_date < start_date):
         dates[this_channel][this_product][this_client] = this_date
+
+for i in range(len(dates)):
+    for j in range(len(dates[i])):
+        for k in range(len(dates[i][j])):
+            item = dates[i][j][k]
+            if isinstance(item, datetime):
+                dates[i][j][k] = item.date()
+
 
 # Model[] and Dates[] print functions
 
@@ -225,6 +233,7 @@ def print_model():
                 print('\t\tcustomer {}: {}'.format(k, model[i][j][k]))
     return
 
+
 def print_dates():
     print('\nDATES')
     for i in range(len(dates)):
@@ -235,7 +244,9 @@ def print_dates():
                 print('\t\tcustomer {}: {}'.format(k, dates[i][j][k]))
     return
 
+
 print_dates()
+
 
 # Array functions TODO: move into separate module
 
@@ -255,15 +266,35 @@ def ijk(arr_3d, p):  # предполагается матрица (т.е мас
     return (i, j, k)
 
 
-def a_ijk(arr3d, p):
+def a3_ijk(arr3d, p):
     i, j, k = ijk(arr3d, p)
     return arr3d[i][j][k]
 
 
+def ijkd(arr_4d, p): #предполагается матрица (т.е массив, у которого длина подмассивов на всех уровнях одинакова)
+    i = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) // len(arr_4d[0])
+    j = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) % len(arr_4d[0])
+    k = p // len(arr_4d[0][0][0]) % len(arr_4d[0][0])
+    d = p % len(arr_4d[0][0][0])
+    return (i, j, k, d)
+
+def a4_ijk(arr4d, p):
+    i, j, k, d = ijkd(arr4d, p)
+    return arr4d[i][j][k][d]
+
 # Solution
 
 model_1d = to_1d(model)
-c = matrix(model_1d)
+dates_1d = to_1d(dates)
+c = []
+G = []
+
+for p in range(len(model_1d)):
+    for d in range(period_length):
+        c.append(model_1d[p])
+        G.append(0)
+
+B = set(range(len(c)))
 
 rows = []
 
@@ -274,17 +305,19 @@ for i in range(len(channels)):
     rows[i].extend(list(np.ones(len(products) * len_customers)))
     rows[i].extend(list(np.zeros(len(model_1d) - (i + 1) * len(products) * len_customers)))
 
-G = matrix(rows).trans()
+A = matrix(rows).trans()
 
-h = matrix(np.array([10, 50, 100, 20], dtype=float))
+b = matrix(np.zeros(len(c)))
 
-B = set(range(len(model_1d)))
+c = matrix(c)
 
-# status, x = ilp(c, G, h, None, None, set(), B)
+G = matrix(G).trans()
+
+status, x = ilp(c, G, None, A, b, set(), B)
 
 # Output
 
-# table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Expectation', 'x'])
+# table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'x'])
 #
 # for p in range(len(model_1d)):
 #     i, j, k = ijk(model, p)
@@ -295,7 +328,7 @@ B = set(range(len(model_1d)))
 
 # Check constraints
 
-print('\n' + 'CHECKING CONSTRAINTS')
+# print('\n' + 'CHECKING CONSTRAINTS')
 
 # check = []
 # for ch in channels:
