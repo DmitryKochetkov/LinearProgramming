@@ -271,60 +271,73 @@ def a3_ijk(arr3d, p):
     return arr3d[i][j][k]
 
 
-def ijkd(arr_4d, p): #предполагается матрица (т.е массив, у которого длина подмассивов на всех уровнях одинакова)
+def ijkd(arr_4d, p):  # предполагается матрица (т.е массив, у которого длина подмассивов на всех уровнях одинакова)
     i = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) // len(arr_4d[0])
     j = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) % len(arr_4d[0])
     k = p // len(arr_4d[0][0][0]) % len(arr_4d[0][0])
     d = p % len(arr_4d[0][0][0])
     return (i, j, k, d)
 
+
 def a4_ijk(arr4d, p):
     i, j, k, d = ijkd(arr4d, p)
     return arr4d[i][j][k][d]
 
+
 # Solution
+
+# TODO: uncomment in the end
+
+# matrix_channel_on = True
+# print('Turn off matrix_channel? [Y/n]')
+# if input() == 'Y':
+#     matrix_channel_on = False
+# print('Turn off matrix_product? [Y/n]')
 
 model_1d = to_1d(model)
 dates_1d = to_1d(dates)
 c = []
 G = []
+h = []
 
 for p in range(len(model_1d)):
     for d in range(period_length):
         c.append(model_1d[p])
-        G.append(0)
+        if d>0 and d % 3 == 0:
+            G.append(1.0)
+        else:
+            G.append(0.0)
 
 B = set(range(len(c)))
 
 rows = []
 
-for i in range(len(channels)):
-    rows.append(list())
-    rows[i] = list()
-    rows[i].extend(list(np.zeros(i * len(products) * len_customers)))
-    rows[i].extend(list(np.ones(len(products) * len_customers)))
-    rows[i].extend(list(np.zeros(len(model_1d) - (i + 1) * len(products) * len_customers)))
-
-A = matrix(rows).trans()
-
-b = matrix(np.zeros(len(c)))
+h.append(1.0)
 
 c = matrix(c)
-
 G = matrix(G).trans()
+h = matrix(h)
 
-status, x = ilp(c, G, None, A, b, set(), B)
+print('Sizes')
+print('c: ', c.size)
+print('G: ', G.size)
+print('h: ', h.size)
+
+print(G)
+
+status, x = ilp(c, G, h, None, None, set(), B)
 
 # Output
 
-# table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'x'])
-#
-# for p in range(len(model_1d)):
-#     i, j, k = ijk(model, p)
-#     table.add_row([p, i, j, k, c[p], x[p]])
+table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
+
+for p in range(len(model_1d)):
+    i, j, k = ijk(model, p)
+    d = ijk(dates, p)[2]
+    table.add_row([p, i, j, k, d, c[p], x[p]])
 
 # print(table.get_string(sort_key=operator.itemgetter(5, 4), sortby="Expectation")) # just for me to explore, doesn't work btw
-# print(table)
+print(table)
 
 # Check constraints
 
