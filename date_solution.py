@@ -1,11 +1,13 @@
 import csv
-from cvxopt.modeling import variable, op, matrix, sum, _function
-from cvxopt.glpk import ilp
-import numpy as np
+from datetime import datetime
 from operator import itemgetter
-import operator
+
+import numpy as np
+from cvxopt.glpk import ilp
+from cvxopt.modeling import matrix
 from prettytable import PrettyTable
-from datetime import datetime, date
+
+from array_functions import *
 
 # Reading data
 with open('model.csv', 'r') as f:
@@ -44,6 +46,10 @@ with open('parameters.csv', 'r') as f:
     start_date = datetime.strptime(start_date, '%m/%d/%Y')
     period_length = int(period_length)
 
+with open('constraint_absolute_channel.csv') as f:
+    reader = csv.reader(f)
+    constraint_absolute_channel = list(reader)
+
 
 # Useful functions for dictionary_model conversion
 
@@ -75,6 +81,9 @@ def product_by_model(model_code):
 
 # Data types conversion
 
+for i in range(0, len(channels)):
+    channels[i] = channels[i][0]
+
 for model in dict_model:
     model[0] = int(model[0])
 
@@ -94,10 +103,22 @@ for item in matrix_product:
 for item in matrix_channel:
     item[2] = int(item[2])
 
-products.sort(key=itemgetter(0))
+for item in constraint_absolute_channel:
+    item[0] = channels.index(item[0])
 
-for i in range(0, len(channels)):
-    channels[i] = channels[i][0]
+    if item[1] == '.':
+        item[1] = 0
+    else:
+        item[1] = int(item[1])
+
+    if item[2] == ".":
+        item[2] = float("inf")
+    else:
+        item[2] = int(item[2])
+
+constraint_absolute_channel.sort(key=itemgetter(0))
+
+products.sort(key=itemgetter(0))
 
 # scores = scores[:15]  # Simplify
 
@@ -127,6 +148,9 @@ print('\n')
 print("Hist ({} items):".format(len(hist)), hist[:3], "...")
 print("Matrix_Channel ({} items):".format(len(matrix_channel)), matrix_channel[:3], "...")
 print("Matrix_Product ({} items):".format(len(matrix_product)), matrix_product[:3], "...")
+print("Constraint_Absolute_Channel: ({} items):".format(len(constraint_absolute_channel)),
+      constraint_absolute_channel[:3], "...")
+
 print("Start Date:", start_date)
 print("Period Length: {} days".format(period_length))
 
@@ -178,8 +202,6 @@ for score in scores:
 
 # 3. Cut extra data from hist
 
-print("Normalized hist:")
-
 normalized_len = 0
 for i in range(len(hist)):
     if hist[i][0] == len_customers - 1 and hist[i + 1][0] == len_customers:
@@ -187,8 +209,7 @@ for i in range(len(hist)):
 
 hist = hist[:normalized_len]
 
-for item in hist:
-    print(item)
+# TODO: 3.1. Sort hist by dates
 
 # 4. Creating dates[]
 
@@ -199,7 +220,7 @@ for channel in channels:
         dates[channels.index(channel)].append(list())
         dates[channels.index(channel)][products.index(product)] = list()
         for customer in range(len_customers):
-            dates[channels.index(channel)][products.index(product)].append(0)
+            dates[channels.index(channel)][products.index(product)].append(None)
 
 # 5. Filling dates[]
 
@@ -209,8 +230,8 @@ for item in hist:
     this_channel = item[2]
     this_product = item[3] - 1
 
-    if dates[this_channel][this_product][this_client] == 0 or (
-            this_date > dates[this_channel][this_product][this_client] and this_date < start_date):
+    if dates[this_channel][this_product][this_client] is None or (
+            dates[this_channel][this_product][this_client] < this_date < start_date):
         dates[this_channel][this_product][this_client] = this_date
 
 for i in range(len(dates)):
@@ -218,7 +239,7 @@ for i in range(len(dates)):
         for k in range(len(dates[i][j])):
             item = dates[i][j][k]
             if isinstance(item, datetime):
-                dates[i][j][k] = item.date()
+                dates[i][j][k] = int((item.date() - start_date.date()).days)
 
 
 # Model[] and Dates[] print functions
@@ -245,48 +266,41 @@ def print_dates():
     return
 
 
+def print_communications_channel():
+    print('\nCOMMUNICATIONS CHANNEL')
+    for k in range(len(communications_channel)):
+        print('customer {}:'.format(k))
+        for i in range(len(communications_channel[k])):
+            print('\t{}: {}'.format(channels[i], communications_channel[k][i]))
+    return
+
+
+# Creating and filling communications_channel[]:
+
+communications_channel = []
+
+for k in range(len_customers):
+    communications_channel.append(list())
+    for i in range(len(channels)):
+        communications_channel[k].append(None)
+
+for item in hist:
+    this_client = item[0]
+    this_date = item[1]
+    this_channel = item[2]
+    this_product = item[3] - 1
+
+    if communications_channel[this_client][this_channel] is None or (communications_channel[this_client][
+        this_channel] < this_date < start_date):
+        communications_channel[this_client][this_channel] = this_date
+
 print_dates()
 
-
-# Array functions TODO: move into separate module
-
-def to_1d(arr3d):
-    arr1d = []
-    for i in range(len(arr3d)):
-        for j in range(len(arr3d[i])):
-            for k in range(len(arr3d[i][j])):
-                arr1d.append(arr3d[i][j][k])
-    return arr1d
-
-
-def ijk(arr_3d, p):  # предполагается матрица (т.е массив, у которого длина подмассивов на всех уровнях одинакова)
-    i = p // len(arr_3d[0][0]) // len(arr_3d[0])
-    j = p // len(arr_3d[0][0]) % len(arr_3d[0])
-    k = p % len(arr_3d[0][0])
-    return (i, j, k)
-
-
-def a3_ijk(arr3d, p):
-    i, j, k = ijk(arr3d, p)
-    return arr3d[i][j][k]
-
-
-def ijkd(arr_4d, p):  # предполагается матрица (т.е массив, у которого длина подмассивов на всех уровнях одинакова)
-    i = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) // len(arr_4d[0])
-    j = p // len(arr_4d[0][0][0]) // len(arr_4d[0][0]) % len(arr_4d[0])
-    k = p // len(arr_4d[0][0][0]) % len(arr_4d[0][0])
-    d = p % len(arr_4d[0][0][0])
-    return (i, j, k, d)
-
-
-def a4_ijk(arr4d, p):
-    i, j, k, d = ijkd(arr4d, p)
-    return arr4d[i][j][k][d]
-
+print_communications_channel()
 
 # Solution
 
-# TODO: uncomment in the end
+# TODO: uncomment optional section when done
 
 # matrix_channel_on = True
 # print('Turn off matrix_channel? [Y/n]')
@@ -294,36 +308,63 @@ def a4_ijk(arr4d, p):
 #     matrix_channel_on = False
 # print('Turn off matrix_product? [Y/n]')
 
+# if matrix_channel_on == False:
+#
+
+output = []
+
 model_1d = to_1d(model)
 dates_1d = to_1d(dates)
 c = []
 G = []
 h = []
 
+A = []
+b = []
+
 for p in range(len(model_1d)):
+    # # TODO: try this
+    # buf = list(np.ones(3, dtype=float))
+    # buf.extend(list(np.zeros(period_length - 3, dtype=float)))
+    # G.append(buf)
+    # h.append(0.0)
+
     for d in range(period_length):
+        i, j, k = ijk(model, p)  # i - channel, j - product, k - customer, d - day
         c.append(model_1d[p])
-        if d>0 and d % 3 == 0:
-            G.append(1.0)
-        else:
-            G.append(0.0)
+        output.append([p * period_length + d, i, j, k, d, model_1d[p], '?'])
+
+# constraints absolute channel
+
+for i in range(len(channels)):
+    G.append(list())
+    G[i] = list()
+    G[i].extend(list(np.zeros(i * len(products) * len_customers * period_length)))
+    G[i].extend(list(np.ones(len(products) * len_customers * period_length)))
+    G[i].extend(list(np.zeros(period_length * (len(model_1d) - (i + 1) * len(products) * len_customers))))
+    # print('rows[{}] ({} items): '.format(i, len(G[i])), G[i])
+
+for constraint in constraint_absolute_channel:
+    h.append(constraint[2])
+
+# TODO: constraints absolute product
+
+# matrix_channel constraints
 
 B = set(range(len(c)))
-
-rows = []
-
-h.append(1.0)
 
 c = matrix(c)
 G = matrix(G).trans()
 h = matrix(h)
+A = matrix(A).trans()
+b = matrix(b)
 
 print('Sizes')
 print('c: ', c.size)
 print('G: ', G.size)
 print('h: ', h.size)
-
-print(G)
+print('A: ', A.size)
+print('b: ', b.size)
 
 status, x = ilp(c, G, h, None, None, set(), B)
 
@@ -331,25 +372,55 @@ status, x = ilp(c, G, h, None, None, set(), B)
 
 table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
 
-for p in range(len(model_1d)):
-    i, j, k = ijk(model, p)
-    d = ijk(dates, p)[2]
-    table.add_row([p, i, j, k, d, c[p], x[p]])
+x = np.array(x)
 
-# print(table.get_string(sort_key=operator.itemgetter(5, 4), sortby="Expectation")) # just for me to explore, doesn't work btw
-print(table)
+for i in range(len(output)):
+    output[i][6] = float(x[i])
+
+output.sort(key=itemgetter(4))
+
+for p in range(x.size):
+    table.add_row(output[p])
+
+print(table.get_string(start=0, end=31))
 
 # Check constraints
 
-# print('\n' + 'CHECKING CONSTRAINTS')
+print('\n' + 'CHECKING CONSTRAINTS')
 
-# check = []
-# for ch in channels:
-#     check.append(0)
-#
-# for p in range(len(model_1d)):
-#     this_channel = ijk(model, p)[0]
-#     check[this_channel] += x[p]
-#
-# for ch in range(len(channels)):
-#     print('Total {}: {}'.format(channels[ch], check[ch]))
+print('Step 1: constraints absolute channel')
+
+check1 = []
+for ch in channels:
+    check1.append(0)
+
+for item in output:
+    this_channel = item[1]
+    check1[this_channel] += item[6]
+
+for ch in range(len(channels)):
+    print('Total {}: {} ({})'.format(channels[ch], check1[ch],
+                                     'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
+                                                  constraint_absolute_channel[ch][2] else 'Incorrect'))
+
+print('\n' + 'Step 2: matrix channel')
+
+check2_flag = True
+
+for p in range(len(output)):
+    ch = output[p][1]
+    cust = output[p][3]
+    if x[p] == 1.0:
+        if communications_channel[cust][ch] is not None and communications_channel[cust][ch] < 0:
+            check2_flag = False
+
+
+# TODO: проблема: для 1 клиента нужно хранить 4 конcтрэйнта по каждому из каналов
+
+
+if check2_flag:
+    print('Check 2 is submitted.')
+else:
+    print('Check 2 is not submitted.')
+
+# TODO: check3: matrix product
