@@ -61,7 +61,6 @@ with open('hist.csv', 'r') as f:
         last_id = item[0]
         item[0] = last_surrogate_id
 
-
 with open('matrix_channel.csv', 'r') as f:
     reader = csv.reader(f)
     matrix_channel = []
@@ -149,8 +148,10 @@ print("Hist ({} items):".format(len(hist)))
 hist_preview = PrettyTable(['surrogate_customer_id', 'date', 'channel_code', 'product_code'])
 
 for i in range(3):
-    hist_preview.add_row(hist[len(hist)-i-1])
+    hist_preview.add_row(hist[i])
 hist_preview.add_row(['...', '...', '...', '...'])
+for i in range(3):
+    hist_preview.add_row(hist[len(hist) - i - 1])
 
 print(hist_preview)
 
@@ -316,7 +317,8 @@ for item in hist:
                 communications_channel[k][i] = 0
 
     for i in range(len(channels)):
-        if communications_channel[this_client][this_channel] is None or communications_channel[this_client][this_channel] < matrix_channel[this_channel][i]:
+        if communications_channel[this_client][this_channel] is None or communications_channel[this_client][
+            this_channel] < matrix_channel[this_channel][i]:
             communications_channel[this_client][i] = matrix_channel[this_channel][i]
 
 shift = 0
@@ -360,13 +362,9 @@ h = []
 A = []
 b = []
 
-for p in range(len(model_1d)):
-    # # TODO: try this
-    # buf = list(np.ones(3, dtype=float))
-    # buf.extend(list(np.zeros(period_length - 3, dtype=float)))
-    # G.append(buf)
-    # h.append(0.0)
+# the objective function
 
+for p in range(len(model_1d)):
     for d in range(period_length):
         i, j, k = ijk(model, p)  # i - channel, j - product, k - customer, d - day
         c.append(model_1d[p])
@@ -437,28 +435,39 @@ for item in output:
 for ch in range(len(channels)):
     print('Total {}: {} ({})'.format(channels[ch], check1[ch],
                                      'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
-                                                  constraint_absolute_channel[ch][2] else 'Incorrect'))
+                                                  constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
 
 print('\n' + 'Step 2: matrix channel')
 
 check2_flag = True
-
-# TODO: использовать communications_channel, отсортировать по датам
-current_day = 0
+check2_info = ''
 
 for p in range(len(output)):
     ch = output[p][1]
     cust = output[p][3]
     day = output[p][4]
-    if x[p] == 1.0:
-        if communications_channel[cust][ch] is not None and communications_channel[cust][ch] < 0:
-            check2_flag = False
 
+    if day > output[p-1][4]:
+        for k in range(len_customers):
+            for i in range(len(channels)):
+                if communications_channel[k][i] > 0:
+                    communications_channel[k][i] -= 1
+
+    if x[p] == 1.0:
+        if communications_channel[cust][ch] > 0:
+            check2_flag = False
+            check2_info = 'Constraint failed for customer {} at channel {} at day {}. Channel was forbidden for {} ' \
+                          'days more.'.format(cust, ch, day, communications_channel[cust][ch])
+            break
+
+        for i in range(len(channels)):
+            if matrix_channel[ch][i] > communications_channel[cust][i]:
+                communications_channel[cust][i] = matrix_channel[ch][i]
 
 if check2_flag:
-    print('Check 2 is submitted.')
+    print('Check 2 is submitted.', check2_info)
 else:
-    print('Check 2 is not submitted.')
+    print('\033[31mCheck 2 is not submitted.\033[0m', check2_info)
 
 # TODO: check3: matrix product
 
