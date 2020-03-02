@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from operator import itemgetter
 
 import numpy as np
@@ -9,34 +9,78 @@ from prettytable import PrettyTable
 
 from array_functions import *
 
-# Reading data
+# Reading data and types' conversion
+
 with open('model.csv', 'r') as f:
     reader = csv.reader(f)
     dict_model = list(reader)
+    for model in dict_model:
+        model[0] = int(model[0])
 
 with open('products.csv', 'r') as f:
     reader = csv.reader(f)
     products = list(reader)
+    for product in products:
+        product[0] = int(product[0])
+        product[2] = float(product[2])
+    products.sort(key=itemgetter(0))
 
 with open('scores.csv', 'r') as f:
     reader = csv.reader(f)
     scores = list(reader)
+    for score in scores:
+        score[0] = int(score[0])
+        score[1] = int(score[1])
+        score[2] = float(score[2])
 
 with open('channels.csv', 'r') as f:
     reader = csv.reader(f)
     channels = list(reader)
+    for i in range(0, len(channels)):
+        channels[i] = channels[i][0]
 
 with open('hist.csv', 'r') as f:
     reader = csv.reader(f)
     hist = list(reader)
+    for item in hist:
+        item[0] = int(item[0])
+        item[2] = int(item[2])
+        item[3] = int(item[3])
+        item[1] = datetime.strptime(item[1], '%m/%d/%Y %H:%M')
+
+    # Normalize ids in hist
+
+    last_id = -1
+    last_surrogate_id = -1
+
+    hist.sort(key=itemgetter(0))
+
+    for item in hist:
+        if item[0] > last_id:
+            last_surrogate_id += 1
+        last_id = item[0]
+        item[0] = last_surrogate_id
+
 
 with open('matrix_channel.csv', 'r') as f:
     reader = csv.reader(f)
-    matrix_channel = list(reader)
+    matrix_channel = []
+    for i1 in range(len(channels)):
+        matrix_channel.append(list())
+        for i2 in range(len(channels)):
+            matrix_channel[i1].append(None)
+
+    for line in reader:
+        line[0] = channels.index(line[0])
+        line[1] = channels.index(line[1])
+        line[2] = int(line[2])
+        matrix_channel[line[0]][line[1]] = line[2]
 
 with open('matrix_product.csv', 'r') as f:
     reader = csv.reader(f)
     matrix_product = list(reader)
+    for item in matrix_product:
+        item[2] = int(item[2])
 
 with open('parameters.csv', 'r') as f:
     reader = csv.reader(f)
@@ -49,6 +93,22 @@ with open('parameters.csv', 'r') as f:
 with open('constraint_absolute_channel.csv') as f:
     reader = csv.reader(f)
     constraint_absolute_channel = list(reader)
+
+    # limits conversion
+    for item in constraint_absolute_channel:
+        item[0] = channels.index(item[0])
+
+        if item[1] == '.':
+            item[1] = 0
+        else:
+            item[1] = int(item[1])
+
+        if item[2] == ".":
+            item[2] = float("inf")
+        else:
+            item[2] = int(item[2])
+
+    constraint_absolute_channel.sort(key=itemgetter(0))  # sort by channel_id
 
 
 # Useful functions for dictionary_model conversion
@@ -78,67 +138,6 @@ def product_by_model(model_code):
                     return p[0] - 1  # requires products to be sorted by id
     return -2
 
-
-# Data types conversion
-
-for i in range(0, len(channels)):
-    channels[i] = channels[i][0]
-
-for model in dict_model:
-    model[0] = int(model[0])
-
-for product in products:
-    product[0] = int(product[0])
-    product[2] = float(product[2])
-
-for item in hist:
-    item[0] = int(item[0])
-    item[2] = int(item[2])
-    item[3] = int(item[3])
-    item[1] = datetime.strptime(item[1], '%m/%d/%Y %H:%M')
-
-for item in matrix_product:
-    item[2] = int(item[2])
-
-for item in matrix_channel:
-    item[2] = int(item[2])
-
-for item in constraint_absolute_channel:
-    item[0] = channels.index(item[0])
-
-    if item[1] == '.':
-        item[1] = 0
-    else:
-        item[1] = int(item[1])
-
-    if item[2] == ".":
-        item[2] = float("inf")
-    else:
-        item[2] = int(item[2])
-
-constraint_absolute_channel.sort(key=itemgetter(0))
-
-products.sort(key=itemgetter(0))
-
-# scores = scores[:15]  # Simplify
-
-for score in scores:
-    score[0] = int(score[0])
-    score[1] = int(score[1])
-    score[2] = float(score[2])
-
-hist.sort(key=itemgetter(0))
-
-# Normalize ids in hist
-
-last_id = -1
-last_surrogate_id = -1
-
-for item in hist:
-    if item[0] > last_id:
-        last_surrogate_id += 1
-    last_id = item[0]
-    item[0] = last_surrogate_id
 
 print("Dict_Model ({} items):".format(len(dict_model)), dict_model[:3], "...")
 print("Products ({} items):".format(len(products)), products[:3], "...")
@@ -209,7 +208,8 @@ for i in range(len(hist)):
 
 hist = hist[:normalized_len]
 
-# TODO: 3.1. Sort hist by dates
+# After that we can sort history in chronological order
+hist.sort(key=itemgetter(1))
 
 # 4. Creating dates[]
 
@@ -271,7 +271,7 @@ def print_communications_channel():
     for k in range(len(communications_channel)):
         print('customer {}:'.format(k))
         for i in range(len(communications_channel[k])):
-            print('\t{}: {}'.format(channels[i], communications_channel[k][i]))
+            print('\t{}: {} days to wait'.format(channels[i], communications_channel[k][i]))
     return
 
 
@@ -282,7 +282,9 @@ communications_channel = []
 for k in range(len_customers):
     communications_channel.append(list())
     for i in range(len(channels)):
-        communications_channel[k].append(None)
+        communications_channel[k].append(0)
+
+last_date = hist[0][1]
 
 for item in hist:
     this_client = item[0]
@@ -290,9 +292,22 @@ for item in hist:
     this_channel = item[2]
     this_product = item[3] - 1
 
-    if communications_channel[this_client][this_channel] is None or (communications_channel[this_client][
-        this_channel] < this_date < start_date):
-        communications_channel[this_client][this_channel] = this_date
+    shift = 0
+    while this_date > last_date:
+        shift += 1
+        last_date += timedelta(days=1)
+
+    for k in range(len(communications_channel)):
+        for i in range(len(communications_channel[k])):
+            communications_channel[k][i] -= shift
+            if communications_channel[k][i] < 0:
+                communications_channel[k][i] = 0
+
+    for i in range(len(channels)):
+        if communications_channel[this_client][this_channel] is None or communications_channel[this_client][this_channel] < matrix_channel[this_channel][i]:
+            communications_channel[this_client][i] = matrix_channel[this_channel][i]
+
+# теперь начальные ограничения по МКП каналов получены
 
 print_dates()
 
@@ -346,8 +361,6 @@ for i in range(len(channels)):
 
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
-
-# TODO: constraints absolute product
 
 # matrix_channel constraints
 
@@ -407,6 +420,7 @@ print('\n' + 'Step 2: matrix channel')
 
 check2_flag = True
 
+# TODO: переделать полностью
 for p in range(len(output)):
     ch = output[p][1]
     cust = output[p][3]
@@ -415,12 +429,11 @@ for p in range(len(output)):
             check2_flag = False
 
 
-# TODO: проблема: для 1 клиента нужно хранить 4 конcтрэйнта по каждому из каналов
-
-
 if check2_flag:
     print('Check 2 is submitted.')
 else:
     print('Check 2 is not submitted.')
 
 # TODO: check3: matrix product
+
+# TODO: check4: constraint ratio product
