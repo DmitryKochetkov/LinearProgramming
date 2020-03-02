@@ -144,7 +144,16 @@ print("Products ({} items):".format(len(products)), products[:3], "...")
 print("Channels ({} items):".format(len(channels)), channels[:3], "...")
 print("Scores ({} items):".format(len(scores)), scores[:3], "...")
 print('\n')
-print("Hist ({} items):".format(len(hist)), hist[:3], "...")
+print("Hist ({} items):".format(len(hist)))
+
+hist_preview = PrettyTable(['surrogate_customer_id', 'date', 'channel_code', 'product_code'])
+
+for i in range(3):
+    hist_preview.add_row(hist[len(hist)-i-1])
+hist_preview.add_row(['...', '...', '...', '...'])
+
+print(hist_preview)
+
 print("Matrix_Channel ({} items):".format(len(matrix_channel)), matrix_channel[:3], "...")
 print("Matrix_Product ({} items):".format(len(matrix_product)), matrix_product[:3], "...")
 print("Constraint_Absolute_Channel: ({} items):".format(len(constraint_absolute_channel)),
@@ -292,6 +301,9 @@ for item in hist:
     this_channel = item[2]
     this_product = item[3] - 1
 
+    if this_date >= start_date:
+        break
+
     shift = 0
     while this_date > last_date:
         shift += 1
@@ -306,6 +318,17 @@ for item in hist:
     for i in range(len(channels)):
         if communications_channel[this_client][this_channel] is None or communications_channel[this_client][this_channel] < matrix_channel[this_channel][i]:
             communications_channel[this_client][i] = matrix_channel[this_channel][i]
+
+shift = 0
+while last_date < start_date:
+    shift += 1
+    last_date += timedelta(days=1)
+
+for k in range(len(communications_channel)):
+    for i in range(len(communications_channel[k])):
+        communications_channel[k][i] -= shift
+        if communications_channel[k][i] < 0:
+            communications_channel[k][i] = 0
 
 # теперь начальные ограничения по МКП каналов получены
 
@@ -420,10 +443,13 @@ print('\n' + 'Step 2: matrix channel')
 
 check2_flag = True
 
-# TODO: переделать полностью
+# TODO: использовать communications_channel, отсортировать по датам
+current_day = 0
+
 for p in range(len(output)):
     ch = output[p][1]
     cust = output[p][3]
+    day = output[p][4]
     if x[p] == 1.0:
         if communications_channel[cust][ch] is not None and communications_channel[cust][ch] < 0:
             check2_flag = False
