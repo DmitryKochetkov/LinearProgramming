@@ -370,7 +370,7 @@ for p in range(len(model_1d)):
         c.append(model_1d[p])
         output.append([p * period_length + d, i, j, k, d, model_1d[p], '?'])
 
-# constraints absolute channel
+# constraints absolute channel TODO: min range
 
 for i in range(len(channels)):
     G.append(list())
@@ -383,7 +383,16 @@ for i in range(len(channels)):
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
 
-# matrix_channel constraints
+# TODO: matrix_channel constraints
+
+# here is a test constraint to make x30 = 0.0. The problem is that in the output table as well as in the x[] it is line 2.
+
+A.append(list())
+A[0].extend(list(np.zeros(30)))
+A[0].append(1)
+A[0].extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - 31)))
+
+b.append(0.0)
 
 B = set(range(len(c)))
 
@@ -400,10 +409,11 @@ print('h: ', h.size)
 print('A: ', A.size)
 print('b: ', b.size)
 
-status, x = ilp(c, G, h, None, None, set(), B)
+status, x = ilp(c, G, h, A, b, set(), B)
 
 # Output
 
+# TODO: print communication_channel[cust][ch]
 table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
 
 x = np.array(x)
@@ -447,7 +457,7 @@ for p in range(len(output)):
     cust = output[p][3]
     day = output[p][4]
 
-    if day > output[p-1][4]:
+    if day > output[p - 1][4]:
         for k in range(len_customers):
             for i in range(len(channels)):
                 if communications_channel[k][i] > 0:
