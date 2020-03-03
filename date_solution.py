@@ -388,16 +388,34 @@ for constraint in constraint_absolute_channel:
 # here is a test constraint to make x30 = 0.0. The problem is that in the output table as well as in the x[] it is line 2.
 # TODO: теперь вот так вот занулить все иксы из communication channel
 
-for k in range(len_customers):
-    for i in range(len(channels)):
-        if communications_channel[k][i] > 0:
-            for d in range(communications_channel[k][i]): # зануляем все x по дням от 0 до конца ограничения
-                row = list()
-                row.extend(list(np.zeros(30))) #TODO: change 30 to x index
-                row.append(1)
-                row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - 30 - 1)))
-                A.append(row)
-                b.append(0.0)
+# for k in range(len_customers):
+#     for i in range(len(channels)):
+#         if communications_channel[k][i] > 0:
+#             for j in range(len(products)):
+#                 for d in range(communications_channel[k][i]): # зануляем все x по дням от 0 до конца ограничения
+#                     n = 9900
+#                     row = list()
+#                     row.extend(list(np.zeros(n)))
+#                     row.append(1) #TODO: по всем оставшимся продуктам!!!
+#                     row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
+#                     A.append(row)
+#                     b.append(0.0)
+
+
+n = 7230 # ДА ДА ДА, СУЧКА
+row = list()
+row.extend(list(np.zeros(n)))
+row.append(1) #TODO: по всем оставшимся продуктам!!!
+row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
+A.append(row)
+b.append(0.0)
+
+# row = list()
+# row.extend(list(np.zeros(n)))
+# row.append(1) #TODO: по всем оставшимся продуктам!!!
+# row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
+# A.append(row)
+# b.append(0.0)
 
 B = set(range(len(c)))
 
@@ -427,12 +445,14 @@ x = np.array(x)
 for i in range(len(output)):
     output[i][6] = float(x[i])
 
-#output.sort(key=itemgetter(4))
+output.sort(key=itemgetter(4))
 
 for p in range(x.size):
     table.add_row(output[p])
 
-print(table.get_string(start=0, end=151))
+output.sort(key=itemgetter(4))
+
+print(table.get_string(start=0, end=n+5))
 
 # Check constraints
 
@@ -458,24 +478,30 @@ print('\n' + 'Step 2: matrix channel')
 check2_flag = True
 check2_info = ''
 
-for p in range(len(output)):
-    ch = output[p][1]
-    cust = output[p][3]
-    day = output[p][4]
+for test_id in range(len(output)):
+    ch = output[test_id][1]
+    prod = output[test_id][2]
+    cust = output[test_id][3]
+    day = output[test_id][4]
 
-    if day > output[p - 1][4]:
+    if day > output[test_id - 1][4]:
+        print('Day', day)
         for k in range(len_customers):
             for i in range(len(channels)):
                 if communications_channel[k][i] > 0:
                     communications_channel[k][i] -= 1
 
-    if x[p] == 1.0:
+    if output[test_id][6] == 1.0:
         if communications_channel[cust][ch] > 0:
             check2_flag = False
-            check2_info = 'Constraint failed for customer {} at channel {} at day {}. Channel was forbidden for {} ' \
-                          'days more.'.format(cust, ch, day, communications_channel[cust][ch])
+            check2_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
+                          'days more. Additional: test_id = {}, x = {}'.format(cust, ch, prod, day, communications_channel[cust][ch], test_id, output[test_id][6])
             break
-
+        else:
+            print('customer {}, {}, {} days to wait. {}. test_id = {}'.format(cust, channels[ch], communications_channel[cust][ch],
+                                                                '\033[32mOK (x={})\033[0m'.format(output[test_id][6]), test_id))
+    else:
+        print('customer {}, {}, {} days to wait. {}. test_id = {}'.format(cust, channels[ch], communications_channel[cust][ch], '\033[32mOK (x={})\033[0m'.format(output[test_id][6]), test_id))
         for i in range(len(channels)):
             if matrix_channel[ch][i] > communications_channel[cust][i]:
                 communications_channel[cust][i] = matrix_channel[ch][i]
