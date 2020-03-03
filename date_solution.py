@@ -334,9 +334,9 @@ for k in range(len(communications_channel)):
 
 # теперь начальные ограничения по МКП каналов получены
 
-print_dates()
+#print_dates()
 
-print_communications_channel()
+#print_communications_channel()
 
 # Solution
 
@@ -386,13 +386,18 @@ for constraint in constraint_absolute_channel:
 # TODO: matrix_channel constraints
 
 # here is a test constraint to make x30 = 0.0. The problem is that in the output table as well as in the x[] it is line 2.
+# TODO: теперь вот так вот занулить все иксы из communication channel
 
-A.append(list())
-A[0].extend(list(np.zeros(30)))
-A[0].append(1)
-A[0].extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - 31)))
-
-b.append(0.0)
+for k in range(len_customers):
+    for i in range(len(channels)):
+        if communications_channel[k][i] > 0:
+            for d in range(communications_channel[k][i]): # зануляем все x по дням от 0 до конца ограничения
+                row = list()
+                row.extend(list(np.zeros(30))) #TODO: change 30 to x index
+                row.append(1)
+                row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - 30 - 1)))
+                A.append(row)
+                b.append(0.0)
 
 B = set(range(len(c)))
 
@@ -410,6 +415,7 @@ print('A: ', A.size)
 print('b: ', b.size)
 
 status, x = ilp(c, G, h, A, b, set(), B)
+# status, x = ilp(c, G, h, None, None, set(), B)
 
 # Output
 
@@ -421,12 +427,12 @@ x = np.array(x)
 for i in range(len(output)):
     output[i][6] = float(x[i])
 
-output.sort(key=itemgetter(4))
+#output.sort(key=itemgetter(4))
 
 for p in range(x.size):
     table.add_row(output[p])
 
-print(table.get_string(start=0, end=31))
+print(table.get_string(start=0, end=151))
 
 # Check constraints
 
