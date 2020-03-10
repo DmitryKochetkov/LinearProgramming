@@ -386,7 +386,8 @@ for i in range(len(channels)):
     # G[i].extend(list(np.zeros(period_length * (len(model_1d) - (i + 1) * len(products) * len_customers))))
 
     G_x.extend(np.ones(len(products) * len_customers * period_length, dtype=float).tolist())
-    a = range(i * len(products) * len_customers * period_length, (i+1) * len(products) * len_customers * period_length)
+    a = range(i * len(products) * len_customers * period_length,
+              (i + 1) * len(products) * len_customers * period_length)
     q = np.ones(len(a), dtype=int) * i
     q = [int(q_item) for q_item in q]
 
@@ -490,34 +491,47 @@ for constraint in constraint_absolute_channel:
 #         h.append(1.0)
 #         # row = list2d_to_1d(row)
 
-# try 3 (uncomment)
+# try 3
 
-# rows = list()
-#
-# for k in range(len_customers):
-#     for i in range(len(channels)):
-#         for j in range(len(products)):
-#                 for d in range(0, period_length):
-#
-#                     for ch2 in range(len(channels)):
-#                         row = list(np.zeros(len(channels) * len(products) * len_customers * period_length))
-#                     #while d+T < period_length:
-#                         for T in range(0, matrix_channel[i][ch2]):
-#                             if d + T < period_length:
-#                                 row[ch2 * len(channels) + j * len(products) + k * len_customers + d + T] = 1.0
-#
-#                         rows.append(row)
-#                         print('Step 2: {}'.format(len(rows)), flush=True)
-#
-#
-# print('Press any key to continue')
+eq = G_i[-1] + 1
+
+for k in range(len_customers):
+    for i in range(len(channels)):
+        for j in range(len(products)):
+            for d in range(0, period_length):
+
+                for ch2 in range(len(channels)):
+                    row = list()
+                    # row = list(np.zeros(len(channels) * len(products) * len_customers * period_length))
+                    # while d+T < period_length:
+                    for T in range(0, matrix_channel[i][ch2]):
+                        if d + T < period_length:
+                            # ones from ch2 * len(channels) + j * len(products) + k * len_customers + d to len(row)
+                            # row[ch2 * len(channels) + j * len(products) + k * len_customers + d + T] = 1.0
+                            row.append(1.0)
+
+                    G_x.extend(row)
+                    G_i.extend(range(ch2 * len(channels) + j * len(products) + k * len_customers + d,
+                                     ch2 * len(channels) + j * len(products) + k * len_customers + d + len(row)))
+                    q = np.ones(len(row)) * eq  # * нужный номер ряда, какое-то число
+                    q = [int(q_item) for q_item in q]
+
+                    G_j.extend(q)
+                    h.append(1.0)  # TODO: move to an appropriate place
+                    eq += 1
+
+# print('Press any key to continue solution')
 # input()
 
-B = set(range(len(c)))
+print(len(G_x))
+print(len(G_i))
+print(len(G_j))
+
+# B = set(range(len(c)))
+B = set(range(22412))
 
 c = matrix(c)
-# G = matrix(G).trans()
-G = spmatrix(G_x, G_i, G_j)
+G = spmatrix(G_x, G_i, G_j).trans()
 h = matrix(h)
 A = matrix(A).trans()
 b = matrix(b)
