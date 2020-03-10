@@ -2,6 +2,7 @@ import csv
 from datetime import datetime, timedelta
 from operator import itemgetter
 
+import time
 import numpy as np
 from cvxopt.glpk import ilp
 from cvxopt.modeling import matrix
@@ -33,6 +34,8 @@ with open('scores.csv', 'r') as f:
         score[1] = int(score[1])
         score[2] = float(score[2])
 
+scores = scores[:120] # TODO: remove simplify
+
 with open('channels.csv', 'r') as f:
     reader = csv.reader(f)
     channels = list(reader)
@@ -61,6 +64,8 @@ with open('hist.csv', 'r') as f:
         last_id = item[0]
         item[0] = last_surrogate_id
 
+hist = hist[:200] # TODO: remove simplify
+
 with open('matrix_channel.csv', 'r') as f:
     reader = csv.reader(f)
     matrix_channel = []
@@ -88,6 +93,8 @@ with open('parameters.csv', 'r') as f:
     period_length = parameters[0][1]
     start_date = datetime.strptime(start_date, '%m/%d/%Y')
     period_length = int(period_length)
+
+start_date = hist[-1][1] # TODO: remove simplify
 
 with open('constraint_absolute_channel.csv') as f:
     reader = csv.reader(f)
@@ -334,9 +341,9 @@ for k in range(len(communications_channel)):
 
 # теперь начальные ограничения по МКП каналов получены
 
-#print_dates()
+# print_dates()
 
-#print_communications_channel()
+# print_communications_channel()
 
 # Solution
 
@@ -353,10 +360,10 @@ for k in range(len(communications_channel)):
 
 output = []
 
-model_1d = to_1d(model)
-dates_1d = to_1d(dates)
+model_1d = list3d_to_1d(model)
+dates_1d = list3d_to_1d(dates)
 c = []
-G = []
+G = [] # TODO: use a sparse matrix
 h = []
 
 A = []
@@ -383,39 +390,123 @@ for i in range(len(channels)):
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
 
-# TODO: matrix_channel constraints
-
-# here is a test constraint to make x30 = 0.0. The problem is that in the output table as well as in the x[] it is line 2.
-# TODO: теперь вот так вот занулить все иксы из communication channel
+# constraints from history channel
 
 # for k in range(len_customers):
 #     for i in range(len(channels)):
 #         if communications_channel[k][i] > 0:
 #             for j in range(len(products)):
-#                 for d in range(communications_channel[k][i]): # зануляем все x по дням от 0 до конца ограничения
-#                     n = 9900
-#                     row = list()
-#                     row.extend(list(np.zeros(n)))
-#                     row.append(1) #TODO: по всем оставшимся продуктам!!!
-#                     row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
-#                     A.append(row)
-#                     b.append(0.0)
+#             #for d in range(communications_channel[k][i]): # зануляем все x по дням от 0 до конца ограничения
+#                 # не работает, потому что для n = 7230 communication_channel[k][i] еще не > 0?
+#                 n = p3(communications_channel, i, j, k) * 30  # TODO: убрать этот лютый костыль
+#                 row = list()
+#                 row.extend(list(np.zeros(n)))
+#                 row.append(1)
+#                 row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
+#                 A.append(row)
+#                 b.append(0.0)
+
+# TODO: по каналу ch1 коммуникации идут не чаще чем matrix_channel[ch1][ch2]
+
+# for k in range(len_customers):
+#     for j in range(len(products)):
+#         for ch1 in range(len(channels)):
+#             for ch2 in range(len(channels)):
+#                 for d in range(period_length):
+#                     row = list(np.zeros(len_customers * len(channels) * len(products) * period_length))
+#                     # n = p3(communications_channel, ch1, j, k) * 30
+#                     #
+#                     # G.append(row)
+#                     # h.append(1.0)
 
 
-n = 7230 # ДА ДА ДА, СУЧКА
-row = list()
-row.extend(list(np.zeros(n)))
-row.append(1) #TODO: по всем оставшимся продуктам!!!
-row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
-A.append(row)
-b.append(0.0)
 
-# row = list()
-# row.extend(list(np.zeros(n)))
-# row.append(1) #TODO: по всем оставшимся продуктам!!!
-# row.extend(list(np.zeros(len_customers * len(channels) * len(products) * period_length - n - 1)))
-# A.append(row)
-# b.append(0.0)
+# try 1
+
+# G2 = []
+# for i in range(len(channels)):
+#     G2.append(list())
+#     for j in range(len(products)):
+#         G2[i].append(list())
+#         for k in range(len_customers):
+#             G2[i][j].append(list())
+#             for d in range(period_length):
+#                 G2[i][j][k].append(0.0)
+#
+# for k in range(len_customers):
+#     for j in range(len(products)):
+#         for ch in range(len(channels)):
+#             for ch2 in range(len(channels)):
+#                 if communications_channel[k][ch] < 30:
+#                     for d in range(communications_channel[k][ch],
+#                                    min(period_length, communications_channel[k][ch] + matrix_channel[ch][ch2])):
+#                         G2[ch][j][k][d] = 1.0  # fail in test_id = 1514
+#                         # A[ch2][j][k][d] = 1.0  # fail in test_id = 27759, non zeros: 0
+#
+# h.append(1.0)
+#
+# G2 = list4d_to_1d(G2)
+# G.append(G2)
+
+# try 2
+
+# for k in range(len_customers):
+#     for i in range(len(channels)):
+#         #row = list(np.zeros(len(channels) * len(products) * len_customers * period_length))
+#         # for j in range(len(products)):
+#         #     row.append(list())
+#         #     for d in range(period_length):
+#         #         row[j].append(0.0)
+#
+#         row = []
+#         for i1 in range(len(channels)):
+#             row.append(list())
+#             for j1 in range(len(products)):
+#                 row[i1].append(list())
+#                 for k1 in range(len_customers):
+#                     row[i1][j1].append(list())
+#                     for d in range(period_length):
+#                         row[i1][j1][k1].append(0.0)
+#
+#         for j in range(len(products)):
+#             #for ch in range(len(channels)):
+#             for ch2 in range(len(channels)):
+#                 #if communications_channel_copy[k][i] < period_length and communications_channel_copy[k][i] < matrix_channel[i][ch2]:
+#                     #for T in range(communications_channel[k][i], 30-communications_channel[k][i]):
+#                 for d in range(0, period_length):
+#                     #while d+T < period_length:
+#                     for T in range(0, matrix_channel[i][ch2]):
+#                             if d + T < period_length:
+#                                 row[ch2][j][k][d+T] = 1.0
+#                             # row[j][d] = 1.0
+#
+#         row = list4d_to_1d(row)
+#         G.append(row)
+#         h.append(1.0)
+#         # row = list2d_to_1d(row)
+
+# try 3 (uncomment)
+
+# rows = list()
+#
+# for k in range(len_customers):
+#     for i in range(len(channels)):
+#         for j in range(len(products)):
+#                 for d in range(0, period_length):
+#
+#                     for ch2 in range(len(channels)):
+#                         row = list(np.zeros(len(channels) * len(products) * len_customers * period_length))
+#                     #while d+T < period_length:
+#                         for T in range(0, matrix_channel[i][ch2]):
+#                             if d + T < period_length:
+#                                 row[ch2 * len(channels) + j * len(products) + k * len_customers + d + T] = 1.0
+#
+#                         rows.append(row)
+#                         print('Step 2: {}'.format(len(rows)), flush=True)
+#
+#
+# print('Press any key to continue')
+# input()
 
 B = set(range(len(c)))
 
@@ -432,12 +523,13 @@ print('h: ', h.size)
 print('A: ', A.size)
 print('b: ', b.size)
 
-status, x = ilp(c, G, h, A, b, set(), B)
-# status, x = ilp(c, G, h, None, None, set(), B)
+# TODO: timer
+
+# status, x = ilp(c, G, h, A, b, set(), B)
+status, x = ilp(c, G, h, None, None, set(), B)
 
 # Output
 
-# TODO: print communication_channel[cust][ch]
 table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
 
 x = np.array(x)
@@ -452,7 +544,7 @@ for p in range(x.size):
 
 output.sort(key=itemgetter(4))
 
-print(table.get_string(start=0, end=n+5))
+print(table.get_string(start=0, end=5))
 
 # Check constraints
 
@@ -477,6 +569,7 @@ print('\n' + 'Step 2: matrix channel')
 
 check2_flag = True
 check2_info = ''
+non_zeros = 0
 
 for test_id in range(len(output)):
     ch = output[test_id][1]
@@ -491,17 +584,28 @@ for test_id in range(len(output)):
                 if communications_channel[k][i] > 0:
                     communications_channel[k][i] -= 1
 
+    this_x = output[test_id][6]
+    if this_x != 0.0:
+        non_zeros += 1
+
     if output[test_id][6] == 1.0:
         if communications_channel[cust][ch] > 0:
             check2_flag = False
             check2_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
-                          'days more. Additional: test_id = {}, x = {}'.format(cust, ch, prod, day, communications_channel[cust][ch], test_id, output[test_id][6])
+                          'days more. Additional: test_id = {}, x = {}'.format(cust, ch, prod, day,
+                                                                               communications_channel[cust][ch],
+                                                                               test_id, output[test_id][6])
             break
         else:
-            print('customer {}, {}, {} days to wait. {}. test_id = {}'.format(cust, channels[ch], communications_channel[cust][ch],
-                                                                '\033[32mOK (x={})\033[0m'.format(output[test_id][6]), test_id))
+            print('customer {}, {}, {} days to wait. {}. test_id = {}, non zeros: {}'.format(cust, channels[ch],
+                                                                              communications_channel[cust][ch],
+                                                                              '\033[32mOK (x={})\033[0m'.format(
+                                                                                  output[test_id][6]), test_id, non_zeros))
     else:
-        print('customer {}, {}, {} days to wait. {}. test_id = {}'.format(cust, channels[ch], communications_channel[cust][ch], '\033[32mOK (x={})\033[0m'.format(output[test_id][6]), test_id))
+        print('customer {}, {}, {} days to wait. {}. test_id = {}, non zeros: {}'.format(cust, channels[ch],
+                                                                          communications_channel[cust][ch],
+                                                                          '\033[32mOK (x={})\033[0m'.format(
+                                                                              output[test_id][6]), test_id, non_zeros))
         for i in range(len(channels)):
             if matrix_channel[ch][i] > communications_channel[cust][i]:
                 communications_channel[cust][i] = matrix_channel[ch][i]
