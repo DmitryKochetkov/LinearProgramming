@@ -511,13 +511,13 @@ for k in range(len_customers):
                             row.append(1.0)
 
                     G_x.extend(row)
-                    G_i.extend(range(ch2 * len(channels) + j * len(products) + k * len_customers + d,
+                    G_j.extend(range(ch2 * len(channels) + j * len(products) + k * len_customers + d,
                                      ch2 * len(channels) + j * len(products) + k * len_customers + d + len(row)))
-                    q = np.ones(len(row)) * eq  # * нужный номер ряда, какое-то число
+                    q = np.ones(len(row)) * eq
                     q = [int(q_item) for q_item in q]
 
-                    G_j.extend(q)
-                    h.append(1.0)  # TODO: move to an appropriate place
+                    G_i.extend(q)
+                    h.append(1.0)
                     eq += 1
 
 # print('Press any key to continue solution')
@@ -527,11 +527,10 @@ print(len(G_x))
 print(len(G_i))
 print(len(G_j))
 
-# B = set(range(len(c)))
-B = set(range(22412))
+B = set(range(len(c)))
 
 c = matrix(c)
-G = spmatrix(G_x, G_i, G_j).trans()
+G = spmatrix(G_x, G_i, G_j)
 h = matrix(h)
 A = matrix(A).trans()
 b = matrix(b)
@@ -642,3 +641,9 @@ else:
 # TODO: check3: matrix product
 
 # TODO: check4: constraint ratio product
+
+objective = 0.0
+for item in output:
+    objective += -item[5] * item[6]
+
+print("Objective function: {}".format(objective))
