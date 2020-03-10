@@ -5,7 +5,7 @@ from operator import itemgetter
 import time
 import numpy as np
 from cvxopt.glpk import ilp
-from cvxopt.modeling import matrix
+from cvxopt.modeling import matrix, spmatrix
 from prettytable import PrettyTable
 
 from array_functions import *
@@ -33,8 +33,6 @@ with open('scores.csv', 'r') as f:
         score[0] = int(score[0])
         score[1] = int(score[1])
         score[2] = float(score[2])
-
-scores = scores[:120] # TODO: remove simplify
 
 with open('channels.csv', 'r') as f:
     reader = csv.reader(f)
@@ -64,8 +62,6 @@ with open('hist.csv', 'r') as f:
         last_id = item[0]
         item[0] = last_surrogate_id
 
-hist = hist[:200] # TODO: remove simplify
-
 with open('matrix_channel.csv', 'r') as f:
     reader = csv.reader(f)
     matrix_channel = []
@@ -93,8 +89,6 @@ with open('parameters.csv', 'r') as f:
     period_length = parameters[0][1]
     start_date = datetime.strptime(start_date, '%m/%d/%Y')
     period_length = int(period_length)
-
-start_date = hist[-1][1] # TODO: remove simplify
 
 with open('constraint_absolute_channel.csv') as f:
     reader = csv.reader(f)
@@ -363,13 +357,18 @@ output = []
 model_1d = list3d_to_1d(model)
 dates_1d = list3d_to_1d(dates)
 c = []
-G = [] # TODO: use a sparse matrix
+# G = [] # TODO: use a sparse matrix
+
+G_x = []  # values in a sparse matrix
+G_i = []  # row indexes in a sparse matrix
+G_j = []  # column indexes in a sparse matrix
+
 h = []
 
 A = []
 b = []
 
-# the objective function
+# the objective function (in order by ijkd: 0000, 0001, 0002, etc...)
 
 for p in range(len(model_1d)):
     for d in range(period_length):
@@ -380,12 +379,19 @@ for p in range(len(model_1d)):
 # constraints absolute channel TODO: min range
 
 for i in range(len(channels)):
-    G.append(list())
-    G[i] = list()
-    G[i].extend(list(np.zeros(i * len(products) * len_customers * period_length)))
-    G[i].extend(list(np.ones(len(products) * len_customers * period_length)))
-    G[i].extend(list(np.zeros(period_length * (len(model_1d) - (i + 1) * len(products) * len_customers))))
-    # print('rows[{}] ({} items): '.format(i, len(G[i])), G[i])
+    # G.append(list())
+    # G[i] = list()
+    # G[i].extend(list(np.zeros(i * len(products) * len_customers * period_length)))
+    # G[i].extend(list(np.ones(len(products) * len_customers * period_length)))
+    # G[i].extend(list(np.zeros(period_length * (len(model_1d) - (i + 1) * len(products) * len_customers))))
+
+    G_x.extend(np.ones(len(products) * len_customers * period_length, dtype=float).tolist())
+    a = range(i * len(products) * len_customers * period_length, (i+1) * len(products) * len_customers * period_length)
+    q = np.ones(len(a), dtype=int) * i
+    q = [int(q_item) for q_item in q]
+
+    G_i.extend(q)
+    G_j.extend(a)
 
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
@@ -418,7 +424,6 @@ for constraint in constraint_absolute_channel:
 #                     #
 #                     # G.append(row)
 #                     # h.append(1.0)
-
 
 
 # try 1
@@ -511,7 +516,8 @@ for constraint in constraint_absolute_channel:
 B = set(range(len(c)))
 
 c = matrix(c)
-G = matrix(G).trans()
+# G = matrix(G).trans()
+G = spmatrix(G_x, G_i, G_j)
 h = matrix(h)
 A = matrix(A).trans()
 b = matrix(b)
@@ -598,14 +604,18 @@ for test_id in range(len(output)):
             break
         else:
             print('customer {}, {}, {} days to wait. {}. test_id = {}, non zeros: {}'.format(cust, channels[ch],
-                                                                              communications_channel[cust][ch],
-                                                                              '\033[32mOK (x={})\033[0m'.format(
-                                                                                  output[test_id][6]), test_id, non_zeros))
+                                                                                             communications_channel[
+                                                                                                 cust][ch],
+                                                                                             '\033[32mOK (x={})\033[0m'.format(
+                                                                                                 output[test_id][6]),
+                                                                                             test_id, non_zeros))
     else:
         print('customer {}, {}, {} days to wait. {}. test_id = {}, non zeros: {}'.format(cust, channels[ch],
-                                                                          communications_channel[cust][ch],
-                                                                          '\033[32mOK (x={})\033[0m'.format(
-                                                                              output[test_id][6]), test_id, non_zeros))
+                                                                                         communications_channel[cust][
+                                                                                             ch],
+                                                                                         '\033[32mOK (x={})\033[0m'.format(
+                                                                                             output[test_id][6]),
+                                                                                         test_id, non_zeros))
         for i in range(len(channels)):
             if matrix_channel[ch][i] > communications_channel[cust][i]:
                 communications_channel[cust][i] = matrix_channel[ch][i]
