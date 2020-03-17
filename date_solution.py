@@ -276,13 +276,17 @@ def print_dates():
     return
 
 
-def print_communications_channel():
-    print('\nCOMMUNICATIONS CHANNEL')
-    for k in range(len(communications_channel)):
-        print('customer {}:'.format(k))
-        for i in range(len(communications_channel[k])):
-            print('\t{}: {} days to wait'.format(channels[i], communications_channel[k][i]))
-    return
+def print_communications_channel(cust=None):
+    print('\nCOMMUNICATIONS CHANNEL', 'for customer {}'.format(cust) if cust is not None else '')
+    if isinstance(cust, int):
+        print('customer {}:'.format(cust))
+        for i in range(len(communications_channel[cust])):
+            print('\t{}: {} days to wait'.format(channels[i], communications_channel[cust][i]))
+    else:
+        for k in range(len(communications_channel)):
+            print('customer {}:'.format(k))
+            for i in range(len(communications_channel[k])):
+                print('\t{}: {} days to wait'.format(channels[i], communications_channel[k][i]))
 
 
 # Creating and filling communications_channel[]:
@@ -336,7 +340,7 @@ for k in range(len(communications_channel)):
 
 # print_dates()
 
-print_communications_channel()
+#print_communications_channel()
 
 # SOLUTION
 
@@ -397,15 +401,15 @@ for constraint in constraint_absolute_channel:
 some_max = -1
 
 A = np.zeros(len(channels) * len(products) * len_customers * period_length, dtype=float).tolist()
-for k in range(len_customers):
-    for i in range(len(channels)):
-        for j in range(len(products)):
+for i in range(len(channels)):
+    for j in range(len(products)):
+        for k in range(len_customers):
             for d in range(period_length):
                 tududu = i * len(
                     products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
                 if tududu > some_max:
                     some_max = tududu
-                if min(communications_channel[k][i], period_length) < d:
+                if d < communications_channel[k][i]: #TODO: fix
                     A[tududu] = 1.0
 
 print('some_max: {}'.format(some_max))
@@ -599,6 +603,8 @@ for item in hist:
     if item[1].day - start_date.day < 0:
         opt_hist.append([item[0], item[1].day - start_date.day, item[2], item[3]])
 
+print_communications_channel(cust=19)
+
 # моделируем процесс коммуникаций по найденным решениям
 for test_id in range(len(output)):
     ch = output[test_id][1]
@@ -617,7 +623,7 @@ for test_id in range(len(output)):
     if this_x != 0.0:
         non_zeros += 1
 
-    if this_x == 1.0:  # TODO: может я не в том порядке их прохожу?
+    if this_x == 1.0:
         if communications_channel[cust][ch] > 0:
             check2_flag = False
             check2_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
@@ -625,6 +631,7 @@ for test_id in range(len(output)):
                                                                                         communications_channel[cust][
                                                                                             ch],
                                                                                         test_id, output[test_id][6], output[test_id][0])
+            print_communications_channel(cust=cust)
             opt_hist.sort(key=itemgetter(1))
             opt_hist.reverse()
 
@@ -633,11 +640,13 @@ for test_id in range(len(output)):
             tududu = ch * len(
                 products) * len_customers * period_length + prod * len_customers * period_length + cust * period_length + day
             print('Tududu for this test is', tududu)
+            print('A[tududu] = {}'.format(A[tududu]))
 
             for item in opt_hist:
                 if item[0] == cust:
                     check2_info += '\nThe last communication with customer {} was on day {} (channel {}, product {})'.format(
                         cust, item[1], item[2], item[3])
+                    # TODO: для отладки нужна не только последняя коммуникация с клиентом, она нужна еще и по тому же каналу
                     break
             print()
 
@@ -674,6 +683,9 @@ for test_id in range(len(output)):
             for k, v in inequalities.items():
                 print('Inequality {} ({} слагаемых): {} {}'.format(k, len(v), v,
                                                                    'Empty inequality' if len(v) == 0 else '< 1'))
+            # TODO: вывести уравнения
+
+
 
             break
         else:
@@ -686,6 +698,9 @@ for test_id in range(len(output)):
                                                                                                             6]),
                                                                                                     test_id, non_zeros))
             opt_hist.append([cust, day, ch, prod])
+            for i in range(len(channels)):
+                if matrix_channel[ch][i] > communications_channel[cust][i]:
+                    communications_channel[cust][i] = matrix_channel[ch][i]
 
     else:
         print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
@@ -696,17 +711,12 @@ for test_id in range(len(output)):
                                                                                                       output[test_id][
                                                                                                           6]),
                                                                                                   test_id, non_zeros))
-        #opt_hist.append([cust, day, ch, prod])
-        for i in range(len(channels)):
-            if matrix_channel[ch][i] > communications_channel[cust][i]:
-                communications_channel[cust][i] = matrix_channel[ch][i]
+
 
 if check2_flag:
     print('Check 2 is submitted.', check2_info)
 else:
     print('\033[31mCheck 2 is not submitted.\033[0m', check2_info)
-
-# print(opt_hist)
 
 # TODO: check3: matrix product
 
@@ -721,18 +731,18 @@ print("Final objective function: {}".format(objective))
 table_opt_hist = PrettyTable(['surrogate_customer_id', 'relative date', 'channel_code', 'product_code'])
 for item in opt_hist:
     table_opt_hist.add_row(item)
-print('Full optimization history REVERSED {}'.format('' if check2_flag else '(before fail)'))
-print(table_opt_hist)
+# print('REVERSED Full optimization history {}'.format('' if check2_flag else '(until failed test)'))
+# print(table_opt_hist)
 
-output.sort(key=itemgetter(0))  # восстановление изначального порядка иксов в output
-print("FROM output[]:")
-for j in range(len(products)):
-    i = 0
-    k = 91
-    d = 0
-    tududu = i * len(
-        products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-    print(output[tududu][6], '(tududu = {})'.format(tududu))
+# output.sort(key=itemgetter(0))  # восстановление изначального порядка иксов в output
+# print("FROM output[]:")
+# for j in range(len(products)):
+#     i = 0
+#     k = 91
+#     d = 0
+#     tududu = i * len(
+#         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+#     print(output[tududu][6], '(tududu = {})'.format(tududu))
 
 
 # функция, выводящая только желаемые корни в отформатированном виде
@@ -756,4 +766,4 @@ def print_roots(ch=None, prod=None, cust=None, day=None):
     print(table)
 
 
-print_roots(ch=0, cust=91, day=0)  # хочу вывести для 91 кастомера
+#print_roots(ch=0, cust=91, day=0)  # хочу вывести для 91 кастомера
