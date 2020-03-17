@@ -118,7 +118,7 @@ for i in range(len(model)):
             print('\t\tcustomer {}: {}'.format(k, model[i][j][k]))
 
 
-# Array functions TODO: move into separate module
+# Array functions
 
 def to_1d(arr3d):
     arr1d = []
