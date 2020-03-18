@@ -9,7 +9,7 @@ from prettytable import PrettyTable
 
 from array_functions import *
 
-# Reading data and types' conversion
+# Чтение данных из csv с конвертацией в нужные типы
 
 with open('model.csv', 'r') as f:
     reader = csv.reader(f)
@@ -48,7 +48,7 @@ with open('hist.csv', 'r') as f:
         item[3] = int(item[3])
         item[1] = datetime.strptime(item[1], '%m/%d/%Y %H:%M')
 
-    # Normalize ids in hist
+    # ID из истории нормализуются, т.е. сопоставляются с ID в dict_model
 
     last_id = -1
     last_surrogate_id = -1
@@ -81,6 +81,7 @@ with open('matrix_product.csv', 'r') as f:
     for item in matrix_product:
         item[2] = int(item[2])
 
+# Параметры оптимизации - стартовая дата и период
 with open('parameters.csv', 'r') as f:
     reader = csv.reader(f)
     parameters = list(reader)
@@ -187,7 +188,7 @@ print('Total clients in Hist:', len(clients_hist))
 if len(clients_scores.intersection(clients_hist)) == 0:
     print('Warning: intersection is an empty set')
 
-# 1. Creating model[]
+# 1. Создаем model как трехмерный список (канал-продукт-клиент)
 model = []
 
 for channel in channels:
@@ -198,7 +199,7 @@ for channel in channels:
         for customer in range(len_customers):
             model[channels.index(channel)][products.index(product)].append(0)
 
-# 2. Filling model
+# 2. Заполняем model данными из таблицы
 for score in scores:
     this_client = score[0]
     this_model = score[1]
@@ -209,7 +210,7 @@ for score in scores:
 
     model[this_channel][this_product][this_client] = -this_probability * products[this_product][2]
 
-# 3. Cut extra data from hist
+# 3. Удаляем из истории данные о клиентах, отсутствующих в модели (часть нормализации ID клиентов)
 
 normalized_len = 0
 for i in range(len(hist)):
@@ -218,41 +219,11 @@ for i in range(len(hist)):
 
 hist = hist[:normalized_len]
 
-# After that we can sort history in chronological order
+# Сортируем истории в хронологическом порядке (по датам)
 hist.sort(key=itemgetter(1))
 
-# 4. Creating dates[]
 
-dates = []
-for channel in channels:
-    dates.append(list())
-    for product in products:
-        dates[channels.index(channel)].append(list())
-        dates[channels.index(channel)][products.index(product)] = list()
-        for customer in range(len_customers):
-            dates[channels.index(channel)][products.index(product)].append(None)
-
-# 5. Filling dates[]
-
-for item in hist:
-    this_client = item[0]
-    this_date = item[1]
-    this_channel = item[2]
-    this_product = item[3] - 1
-
-    if dates[this_channel][this_product][this_client] is None or (
-            dates[this_channel][this_product][this_client] < this_date < start_date):
-        dates[this_channel][this_product][this_client] = this_date
-
-for i in range(len(dates)):
-    for j in range(len(dates[i])):
-        for k in range(len(dates[i][j])):
-            item = dates[i][j][k]
-            if isinstance(item, datetime):
-                dates[i][j][k] = int((item.date() - start_date.date()).days)
-
-
-# Model[] and Dates[] print functions
+# print functions
 
 def print_model():
     print('\nMODEL')
@@ -262,17 +233,6 @@ def print_model():
             print('\t{}:'.format(products[j]))
             for k in range(len(model[i][j])):
                 print('\t\tcustomer {}: {}'.format(k, model[i][j][k]))
-    return
-
-
-def print_dates():
-    print('\nDATES')
-    for i in range(len(dates)):
-        print('{}:'.format(channels[i]))
-        for j in range(len(dates[i])):
-            print('\t{}:'.format(products[j]))
-            for k in range(len(dates[i][j])):
-                print('\t\tcustomer {}: {}'.format(k, dates[i][j][k]))
     return
 
 
@@ -289,7 +249,10 @@ def print_communications_channel(cust=None):
                 print('\t{}: {} days to wait'.format(channels[i], communications_channel[k][i]))
 
 
-# Creating and filling communications_channel[]:
+# communications_channel будет содержать данные об ограничениях из истории до дня начала оптимизации
+# Суть: Коммуникации с клиентом по каналу запрещены еще communication_channel[клиент][канал] дней от начала оптимизации
+# После решения этот список перезаписывается в соответствии с корнями для проверки их корректности
+# TODO: для реализации ограничений по МКП по продуктам потребуется аналогичный список communication_product[клиент][продукт]
 
 communications_channel = []
 
@@ -336,15 +299,12 @@ for k in range(len(communications_channel)):
         if communications_channel[k][i] < 0:
             communications_channel[k][i] = 0
 
-# теперь начальные ограничения по МКП каналов получены
+# теперь получены cтартовые ограничения из истории (пока только для МКП по каналам)
 
-# print_dates()
+# РЕШЕНИЕ
 
-#print_communications_channel()
-
-# SOLUTION
-
-# TODO: uncomment optional section when done
+# Здесь прототип фичи для возможности выбора ограничений пользователем
+# TODO: раскомментировать, когда все будет готово
 
 # matrix_channel_on = True
 # print('Turn off matrix_channel? [Y/n]')
@@ -355,25 +315,24 @@ for k in range(len(communications_channel)):
 # if matrix_channel_on == False:
 #
 
-output = []
+output = []  # отдельный двумерный список для красивого вывода, каждая его строка помещается в красивую табличку
 
+# неравенство-ограничение имеет вид G*x <= h, уравнение-ограничение имеет вид A*x <= b
 model_1d = list3d_to_1d(model)
-dates_1d = list3d_to_1d(dates)
-c = []
+c = []  # коэффициенты при x в целевой функции
 
-G_x = []  # values in a sparse matrix
-G_i = []  # row indexes in a sparse matrix
-G_j = []  # column indexes in a sparse matrix
+# G станет разреженной матрицей коэффициентов неравенства-ограничения
+G_x = []  # значения в разреженной матрице
+G_i = []  # индексы строк для значений в разреженной матрице
+G_j = []  # индексы столбцов для значений в разреженной матрице
 
-h = []
+h = []  # матрица свободных членов неравенства-ограничения
 
-A_x = []  # values in a sparse matrix
-A_i = []  # row indexes in a sparse matrix
-A_j = []  # column indexes in a sparse matrix
+A = []  # матрица коэффициентов уравнения-ограничения
 
-b = []
+b = []  # матрица свободных членов уравнения-ограничения
 
-# the objective function (in order by ijkd: 0000, 0001, 0002, etc...)
+# целевая функция (порядок иксов ijkd: 0000, 0001, 0002, ..., 000_30, 001_0 etc...)
 
 for p in range(len(model_1d)):
     for d in range(period_length):
@@ -381,7 +340,7 @@ for p in range(len(model_1d)):
         c.append(model_1d[p])
         output.append([p * period_length + d, i, j, k, d, model_1d[p], '?'])
 
-# constraints absolute channel TODO: min range
+# ограничения на общее количество коммуникаций по каналу TODO: решить, что делать с нижней границей
 
 for i in range(len(channels)):
     G_x.extend(np.ones(len(products) * len_customers * period_length, dtype=float).tolist())
@@ -396,85 +355,23 @@ for i in range(len(channels)):
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
 
-# constraints from history
-
-some_max = -1
+# ограничения из истории
 
 A = np.zeros(len(channels) * len(products) * len_customers * period_length, dtype=float).tolist()
 for i in range(len(channels)):
     for j in range(len(products)):
         for k in range(len_customers):
             for d in range(period_length):
-                tududu = i * len(
+                index = i * len(
                     products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-                if tududu > some_max:
-                    some_max = tududu
-                if d < communications_channel[k][i]: #TODO: fix
-                    A[tududu] = 1.0
+                if d < communications_channel[k][i]:
+                    A[index] = 1.0
 
-print('some_max: {}'.format(some_max))
 b = [0.0]
 
-# eq = 0 # total amount of equalities
-#
-# for k in range(len_customers):
-#     for i in range(len(channels)):
-#         for j in range(len(products)):
-#             bound = min(period_length, communications_channel[k][i])
-#
-#             q = np.ones(len(bound)) * eq
-#             q = [int(q_item) for q_item in q]
-#
-#             A_x.extend(np.ones(bound).tolist())
-#             A_i.extend(eq)
-#             A_j.extend(eq)
-#             eq += 1
+# ограничения из МКП по каналам
 
-# print(type(A_x[0]))
-
-# constraints from contact policies matrix
-
-neq = G_i[-1] + 1  # total amount of inequalities
-
-# for i in range(len(channels)):
-#     #for j in range(len(products)):
-#         for k in range(len_customers):
-#             for d in range(0, period_length):
-#
-#                 for ch2 in range(len(channels)):
-#                     for j2 in range(len(products)):
-#                         row = list()
-#                         for T in range(0, matrix_channel[i][ch2]):
-#                             if d + T < period_length:
-#                                 row.append(1.0)
-#
-#                         G_x.extend(row)
-#                         # G_j.extend(range(ch2 * len(channels) + j * len(products) + k * len_customers + d,
-#                         #                  ch2 * len(channels) + j * len(products) + k * len_customers + d + len(row)))
-#                         tududu = ch2 * len(products) * len_customers * period_length + j2 * len_customers * period_length + k * period_length + d
-#                         G_j.extend(range(tududu,
-#                                          tududu + len(row)))
-#                         q = np.ones(len(row)) * neq
-#                         q = [int(q_item) for q_item in q]
-#
-#                         G_i.extend(q)
-#                         h.append(1.0)
-#                         neq += 1
-
-# for i in range(len(channels)):
-#     for k in range(len_customers):
-#         # тут генерится неравенство
-#         for d in range(period_length):
-#             for ch2 in range(len(channels)):
-#                 for j in range(len(products)):
-#                     for T in range(min(matrix_channel[i][ch2], period_length)):
-#                         if d+T < period_length:
-#                             tududu = ch2 * len(products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
-#                             G_x.append(1.0)
-#                             G_i.append(neq)
-#                             G_j.append(tududu)
-#                 neq += 1
-#                 h.append(1.0)
+neq = G_i[-1] + 1  # номер последней строки матрицы коэффициентов неравенства
 
 for k in range(len_customers):
     for d in range(period_length):
@@ -488,40 +385,11 @@ for k in range(len_customers):
                 for ch2 in range(len(channels)):
                     for T in range(min(matrix_channel[i][ch2], period_length)):
                         if d + T < period_length:
-                            tududu = ch2 * len(
+                            index = ch2 * len(
                                 products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
                             inequality_x.append(1.0)
                             inequality_i.append(neq)
-                            inequality_j.append(tududu)
-
-            G_x.extend(inequality_x)
-            G_i.extend(inequality_i)
-            G_j.extend(inequality_j)
-            h.append(1.0)
-            neq += 1
-            # tududu = ch2 * len(products) * len_customers * period_length + j2 * len_customers * period_length + k * period_length + d
-            # G_j.extend(range(tududu,
-            #                  tududu + len(row)))
-            # q = np.ones(len(row)) * neq
-            # q = [int(q_item) for q_item in q]
-
-            # G_i.extend(q)
-            # h.append(1.0)
-            # neq += 1
-
-for k in range(len_customers):
-    for d in range(period_length):
-        for i in range(len(channels)):
-
-            inequality_x = list()
-            inequality_i = list()
-            inequality_j = list()
-            for j in range(len(products)):
-                tududu = i * len(
-                    products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-                inequality_x.append(1.0)
-                inequality_i.append(neq)
-                inequality_j.append(tududu)
+                            inequality_j.append(index)
 
             G_x.extend(inequality_x)
             G_i.extend(inequality_i)
@@ -539,8 +407,13 @@ c = matrix(c)
 G = spmatrix(G_x, G_i, G_j)
 h = matrix(h)
 A = matrix(A).trans()
-# A = spmatrix(A_x, A_i, A_j)
 b = matrix(b)
+
+# TODO: попробовать уменьшить количество неравенств, подаваемых на вход оптимизатору
+# amount = 500
+# G.
+# G = G[:amount] # придумать способ с разреженной матрицей
+# h = h[:amount]
 
 print('Sizes')
 print('c: ', c.size)
@@ -549,10 +422,7 @@ print('h: ', h.size)
 print('A: ', A.size)
 print('b: ', b.size)
 
-# TODO: timer
-
 status, x = ilp(c, G, h, A, b, set(), B)
-# status, x = ilp(c, G, h, None, None, set(), B)
 
 # Output
 
@@ -560,7 +430,7 @@ table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expe
 
 x = np.array(x)
 
-# копируем иксы в нужную колонку списка output (это все сделано только для красивой инициализации PrettyTable
+# копируем иксы в нужную колонку списка output (это все сделано только для красивой инициализации PrettyTable)
 # наверняка это можно сделать адекватнее
 
 for i in range(len(output)):
@@ -571,7 +441,7 @@ output.sort(key=itemgetter(4))  # сортируем вывод по датам
 for p in range(x.size):
     table.add_row(output[p])
 
-# Checking constraints
+# Проверка правильности всех ограничений
 
 print('\n' + 'CHECKING CONSTRAINTS')
 
@@ -593,8 +463,8 @@ for ch in range(len(channels)):
 print('\n' + 'Step 2: matrix channel')
 
 check2_flag = True
-check2_info = ''
-non_zeros = 0  # количество ненулевых неизвестных на текущий момент тестирования (чтобы удостовериться, что не все иксы занулились)
+check2_info = '' # информация о том, как прошло тестирование (вернее, на каком корне оно не прошло)
+non_zeros = 0  # количество ненулевых корней на текущий момент тестирования (чтобы удостовериться, что не все иксы занулились)
 
 opt_hist = []  # история, дополненная коммуникациями на период оптимизации
 
@@ -607,11 +477,14 @@ print_communications_channel(cust=19)
 
 # моделируем процесс коммуникаций по найденным решениям
 for test_id in range(len(output)):
+    # получаем канал, продукт, клиент, день и найденный корень для текущей коммуникации
     ch = output[test_id][1]
     prod = output[test_id][2]
     cust = output[test_id][3]
     day = output[test_id][4]
+    this_x = output[test_id][6]
 
+    # Если настал новый день, то все ограничения, лежавшие в communications_channel, уменьшаются на единицу
     if day > output[test_id - 1][4]:
         print('Day', day)
         for k in range(len_customers):
@@ -619,28 +492,33 @@ for test_id in range(len(output)):
                 if communications_channel[k][i] > 0:
                     communications_channel[k][i] -= 1
 
-    this_x = output[test_id][6]
     if this_x != 0.0:
         non_zeros += 1
 
     if this_x == 1.0:
+        # Если коммуникация произошла вопреки ограничению, то тест не пройден.
         if communications_channel[cust][ch] > 0:
             check2_flag = False
             check2_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
                           'days more. Additional: communication_id = {}, x = {}, p = {}'.format(cust, ch, prod, day,
-                                                                                        communications_channel[cust][
-                                                                                            ch],
-                                                                                        test_id, output[test_id][6], output[test_id][0])
+                                                                                                communications_channel[
+                                                                                                    cust][
+                                                                                                    ch],
+                                                                                                test_id,
+                                                                                                output[test_id][6],
+                                                                                                output[test_id][0])
             print_communications_channel(cust=cust)
             opt_hist.sort(key=itemgetter(1))
             opt_hist.reverse()
 
-            # tududu test (check it is the same as in constraints)
+            # дальше какая-то тупая проверка индексов, я в них уже запутался, все это нужно будет выкинуть отсюда
 
-            tududu = ch * len(
+            index = ch * len(
                 products) * len_customers * period_length + prod * len_customers * period_length + cust * period_length + day
-            print('Tududu for this test is', tududu)
-            print('A[tududu] = {}'.format(A[tududu]))
+            print('index for this test is', index)
+            print('A[index] = {}'.format(A[index]))
+
+            # ищем последнюю коммуникацию с данным клиентом, чтобы понять, насколько все плохо
 
             for item in opt_hist:
                 if item[0] == cust:
@@ -650,7 +528,7 @@ for test_id in range(len(output)):
                     break
             print()
 
-            #  логика вывода неравенств (по факту оно ведь там не одно))
+            #  Выводим все неравенства, содержащие переменную, не прошедшую тест
             inequalities = dict()
 
             # проходимся по неравенствам и запоминаем, какие из них содержат переменные, которые хотим посмотреть
@@ -685,8 +563,6 @@ for test_id in range(len(output)):
                                                                    'Empty inequality' if len(v) == 0 else '< 1'))
             # TODO: вывести уравнения
 
-
-
             break
         else:
             print(
@@ -697,7 +573,10 @@ for test_id in range(len(output)):
                                                                                                         output[test_id][
                                                                                                             6]),
                                                                                                     test_id, non_zeros))
+
+            # Если же ограничения не было и коммуникация произошла, добавляем ее в историю оптимизации...
             opt_hist.append([cust, day, ch, prod])
+            # ... и ставим новое ограничение из МКП
             for i in range(len(channels)):
                 if matrix_channel[ch][i] > communications_channel[cust][i]:
                     communications_channel[cust][i] = matrix_channel[ch][i]
@@ -712,7 +591,6 @@ for test_id in range(len(output)):
                                                                                                           6]),
                                                                                                   test_id, non_zeros))
 
-
 if check2_flag:
     print('Check 2 is submitted.', check2_info)
 else:
@@ -722,15 +600,19 @@ else:
 
 # TODO: check4: constraint ratio product
 
+# собираем целевую функцию
 objective = 0.0
 for item in output:
     objective += -item[5] * item[6]
 
 print("Final objective function: {}".format(objective))
 
+# генерируем таблицу истории оптимизации до проваленного теста (она будет выведена в обратном порядке)
 table_opt_hist = PrettyTable(['surrogate_customer_id', 'relative date', 'channel_code', 'product_code'])
 for item in opt_hist:
     table_opt_hist.add_row(item)
+
+
 # print('REVERSED Full optimization history {}'.format('' if check2_flag else '(until failed test)'))
 # print(table_opt_hist)
 
@@ -740,9 +622,9 @@ for item in opt_hist:
 #     i = 0
 #     k = 91
 #     d = 0
-#     tududu = i * len(
+#     index = i * len(
 #         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-#     print(output[tududu][6], '(tududu = {})'.format(tududu))
+#     print(output[index][6], '(index = {})'.format(index))
 
 
 # функция, выводящая только желаемые корни в отформатированном виде
@@ -765,5 +647,4 @@ def print_roots(ch=None, prod=None, cust=None, day=None):
 
     print(table)
 
-
-#print_roots(ch=0, cust=91, day=0)  # хочу вывести для 91 кастомера
+# print_roots(ch=0, cust=91, day=0)  # хочу вывести для 91 кастомера - уже не актуально
