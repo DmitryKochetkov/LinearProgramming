@@ -373,29 +373,59 @@ b = [0.0]
 
 neq = G_i[-1] + 1  # номер последней строки матрицы коэффициентов неравенства
 
+# for k in range(len_customers):
+#     for d in range(period_length):
+#
+#         for i in range(len(channels)):
+#             inequality_x = list()
+#             inequality_i = list()
+#             inequality_j = list()
+#
+#             for j in range(len(products)):
+#                 for ch2 in range(len(channels)):
+#                     for T in range(min(matrix_channel[i][ch2], period_length)):
+#                         if d + T < period_length:
+#                             index = ch2 * len(
+#                                 products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
+#                             inequality_x.append(1.0)
+#                             inequality_i.append(neq)
+#                             inequality_j.append(index)
+#
+#             G_x.extend(inequality_x)
+#             G_i.extend(inequality_i)
+#             G_j.extend(inequality_j)
+#             h.append(1.0)
+#             neq += 1
+
 for k in range(len_customers):
     for d in range(period_length):
 
+        inequality_x = list()
+        inequality_i = list()
+        inequality_j = list()
+
         for i in range(len(channels)):
-            inequality_x = list()
-            inequality_i = list()
-            inequality_j = list()
+
+
+            T_max = 0
+            for ch2 in range(len(channels)):
+                if matrix_channel[i][ch2] > T_max:
+                    T_max = matrix_channel[i][ch2]
 
             for j in range(len(products)):
-                for ch2 in range(len(channels)):
-                    for T in range(min(matrix_channel[i][ch2], period_length)):
-                        if d + T < period_length:
-                            index = ch2 * len(
-                                products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
-                            inequality_x.append(1.0)
-                            inequality_i.append(neq)
-                            inequality_j.append(index)
+                for T in range(min(T_max, period_length)):
+                    if d + T < period_length:
+                        index = i * len(
+                            products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
+                        inequality_x.append(1.0)
+                        inequality_i.append(neq)
+                        inequality_j.append(index)
 
-            G_x.extend(inequality_x)
-            G_i.extend(inequality_i)
-            G_j.extend(inequality_j)
-            h.append(1.0)
-            neq += 1
+        G_x.extend(inequality_x)
+        G_i.extend(inequality_i)
+        G_j.extend(inequality_j)
+        h.append(1.0)
+        neq += 1
 
 print(len(G_x))
 print(len(G_i))
