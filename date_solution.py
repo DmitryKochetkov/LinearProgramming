@@ -397,6 +397,35 @@ neq = G_i[-1] + 1  # номер последней строки матрицы �
 #             h.append(1.0)
 #             neq += 1
 
+# FIRST SUCCESSFUL TRY
+# for k in range(len_customers):
+#     for d in range(period_length):
+#
+#         inequality_x = list()
+#         inequality_i = list()
+#         inequality_j = list()
+#
+#         for i in range(len(channels)):
+#             T_max = 0
+#             for ch2 in range(len(channels)):
+#                 if matrix_channel[i][ch2] > T_max:
+#                     T_max = matrix_channel[i][ch2]
+#
+#             for j in range(len(products)):
+#                 for T in range(min(T_max, period_length)):
+#                     if d + T < period_length:
+#                         index = i * len(
+#                             products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
+#                         inequality_x.append(1.0)
+#                         inequality_i.append(neq)
+#                         inequality_j.append(index)
+#
+#         G_x.extend(inequality_x)
+#         G_i.extend(inequality_i)
+#         G_j.extend(inequality_j)
+#         h.append(1.0)
+#         neq += 1
+
 for k in range(len_customers):
     for d in range(period_length):
 
@@ -405,8 +434,6 @@ for k in range(len_customers):
         inequality_j = list()
 
         for i in range(len(channels)):
-
-
             T_max = 0
             for ch2 in range(len(channels)):
                 if matrix_channel[i][ch2] > T_max:
@@ -475,160 +502,207 @@ for p in range(x.size):
 
 print('\n' + 'CHECKING CONSTRAINTS')
 
-print('Step 1: constraints absolute channel')
 
-check1 = []
-for ch in channels:
-    check1.append(0)
+def ask(q='Start?'):
+    print(q, '[Y/n]')
+    response = input()
+    return response == 'Y'
 
-for item in output:
-    this_channel = item[1]
-    check1[this_channel] += item[6]
 
-for ch in range(len(channels)):
-    print('Total {}: {} ({})'.format(channels[ch], check1[ch],
-                                     'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
-                                                  constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
+print('\n' + 'Step 1: constraints absolute channel')
+if ask():
+    check1 = []
+    for ch in channels:
+        check1.append(0)
 
-print('\n' + 'Step 2: matrix channel')
+    for item in output:
+        this_channel = item[1]
+        check1[this_channel] += item[6]
 
-check2_flag = True
-check2_info = '' # информация о том, как прошло тестирование (вернее, на каком корне оно не прошло)
-non_zeros = 0  # количество ненулевых корней на текущий момент тестирования (чтобы удостовериться, что не все иксы занулились)
+    for ch in range(len(channels)):
+        print('Total {}: {} ({})'.format(channels[ch], check1[ch],
+                                         'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
+                                                      constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
 
-opt_hist = []  # история, дополненная коммуникациями на период оптимизации
+print('\n' + 'Step 2: constraints absolute channel')
+if ask():
+    check2 = []
+    for ch in channels:
+        check2.append(0)
 
-# даты до оптимизации рассчитываются относительно начала оптимизации (день -3 это дата за три дня до начала оптимизации)
-for item in hist:
-    if item[1].day - start_date.day < 0:
-        opt_hist.append([item[0], item[1].day - start_date.day, item[2], item[3]])
+    for item in output:
+        this_channel = item[1]
+        check2[this_channel] += item[6]
 
-print_communications_channel(cust=19)
+    for ch in range(len(channels)):
+        print('Total {}: {} ({})'.format(channels[ch], check2[ch],
+                                         'Correct' if constraint_absolute_channel[ch][1] <= check2[ch] <=
+                                                      constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
 
-# моделируем процесс коммуникаций по найденным решениям
-for test_id in range(len(output)):
-    # получаем канал, продукт, клиент, день и найденный корень для текущей коммуникации
-    ch = output[test_id][1]
-    prod = output[test_id][2]
-    cust = output[test_id][3]
-    day = output[test_id][4]
-    this_x = output[test_id][6]
+print('\n' + 'Step 3: matrix channel')
+if ask():
+    check3_flag = True
+    check3_info = ''  # информация о том, как прошло тестирование (вернее, на каком корне оно не прошло)
+    non_zeros = 0  # количество ненулевых корней на текущий момент тестирования (чтобы удостовериться, что не все иксы занулились)
 
-    # Если настал новый день, то все ограничения, лежавшие в communications_channel, уменьшаются на единицу
-    if day > output[test_id - 1][4]:
-        print('Day', day)
-        for k in range(len_customers):
-            for i in range(len(channels)):
-                if communications_channel[k][i] > 0:
-                    communications_channel[k][i] -= 1
+    opt_hist = []  # история, дополненная коммуникациями на период оптимизации
 
-    if this_x != 0.0:
-        non_zeros += 1
+    # даты до оптимизации рассчитываются относительно начала оптимизации (день -3 это дата за три дня до начала оптимизации)
+    for item in hist:
+        if item[1].day - start_date.day < 0:
+            opt_hist.append([item[0], item[1].day - start_date.day, item[2], item[3]])
 
-    if this_x == 1.0:
-        # Если коммуникация произошла вопреки ограничению, то тест не пройден.
-        if communications_channel[cust][ch] > 0:
-            check2_flag = False
-            check2_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
-                          'days more. Additional: communication_id = {}, x = {}, p = {}'.format(cust, ch, prod, day,
-                                                                                                communications_channel[
-                                                                                                    cust][
-                                                                                                    ch],
-                                                                                                test_id,
-                                                                                                output[test_id][6],
-                                                                                                output[test_id][0])
-            print_communications_channel(cust=cust)
-            opt_hist.sort(key=itemgetter(1))
-            opt_hist.reverse()
+    print_communications_channel(cust=19)
 
-            # дальше какая-то тупая проверка индексов, я в них уже запутался, все это нужно будет выкинуть отсюда
+    # моделируем процесс коммуникаций по найденным решениям
+    for test_id in range(len(output)):
+        # получаем канал, продукт, клиент, день и найденный корень для текущей коммуникации
+        ch = output[test_id][1]
+        prod = output[test_id][2]
+        cust = output[test_id][3]
+        day = output[test_id][4]
+        this_x = output[test_id][6]
 
-            index = ch * len(
-                products) * len_customers * period_length + prod * len_customers * period_length + cust * period_length + day
-            print('index for this test is', index)
-            print('A[index] = {}'.format(A[index]))
+        # Если настал новый день, то все ограничения, лежавшие в communications_channel, уменьшаются на единицу
+        if day > output[test_id - 1][4]:
+            print('Day', day)
+            for k in range(len_customers):
+                for i in range(len(channels)):
+                    if communications_channel[k][i] > 0:
+                        communications_channel[k][i] -= 1
 
-            # ищем последнюю коммуникацию с данным клиентом, чтобы понять, насколько все плохо
+        if this_x != 0.0:
+            non_zeros += 1
 
-            for item in opt_hist:
-                if item[0] == cust:
-                    check2_info += '\nThe last communication with customer {} was on day {} (channel {}, product {})'.format(
-                        cust, item[1], item[2], item[3])
-                    # TODO: для отладки нужна не только последняя коммуникация с клиентом, она нужна еще и по тому же каналу
-                    break
-            print()
-
-            #  Выводим все неравенства, содержащие переменную, не прошедшую тест
-            inequalities = dict()
-
-            # проходимся по неравенствам и запоминаем, какие из них содержат переменные, которые хотим посмотреть
-            for n in range(len(G_i)):
-                i = G_j[n] // period_length // len_customers // len(products)
-                j = G_j[n] // period_length // len_customers % len(products)
-                k = G_j[n] // period_length % len_customers
-                d = G_j[n] % period_length
-
-                if i == ch and j == prod and k == cust and d == day:
-                    # inequalities[inequality_id] = ('x_i{}_j{}_k{}_d{} + '.format(i, j, k, d))
-                    inequalities[G_i[n]] = list()
-
-            # проходимся по переменным, и смотрим есть ли она в неравенстве, которое хотим посмотреть
-            for inequality_item in range(len(G_j)):
-                if G_i[inequality_item] in inequalities.keys():
-                    inequalities[G_i[inequality_item]].append(G_j[inequality_item])
-
-            # восстанавливаем четырехмерность каждого индекса
-            for value in inequalities.values():
-                for n in range(len(value)):
-                    i = value[n] // period_length // len_customers // len(products)
-                    j = value[n] // period_length // len_customers % len(products)
-                    k = value[n] // period_length % len_customers
-                    d = value[n] % period_length
-                    value[n] = 'x_i{}j{}k{}d{}'.format(i, j, k, d)
-
-            # вывод неравенств
-            print('Total inequalities: {}.'.format(len(inequalities)))
-            for k, v in inequalities.items():
-                print('Inequality {} ({} слагаемых): {} {}'.format(k, len(v), v,
-                                                                   'Empty inequality' if len(v) == 0 else '< 1'))
-            # TODO: вывести уравнения
-
-            break
-        else:
-            print(
-                'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
+        if this_x == 1.0:
+            # Если коммуникация произошла вопреки ограничению, то тест не пройден.
+            if communications_channel[cust][ch] > 0:
+                check3_flag = False
+                check3_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Channel was forbidden for {} ' \
+                              'days more. Additional: communication_id = {}, x = {}, p = {}'.format(cust, ch, prod, day,
                                                                                                     communications_channel[
-                                                                                                        cust][ch],
-                                                                                                    '\033[32mOK (x={})\033[0m'.format(
-                                                                                                        output[test_id][
-                                                                                                            6]),
-                                                                                                    test_id, non_zeros))
+                                                                                                        cust][
+                                                                                                        ch],
+                                                                                                    test_id,
+                                                                                                    output[test_id][6],
+                                                                                                    output[test_id][0])
+                print_communications_channel(cust=cust)
+                opt_hist.sort(key=itemgetter(1))
+                opt_hist.reverse()
 
-            # Если же ограничения не было и коммуникация произошла, добавляем ее в историю оптимизации...
-            opt_hist.append([cust, day, ch, prod])
-            # ... и ставим новое ограничение из МКП
-            for i in range(len(channels)):
-                if matrix_channel[ch][i] > communications_channel[cust][i]:
-                    communications_channel[cust][i] = matrix_channel[ch][i]
+                # дальше какая-то тупая проверка индексов, я в них уже запутался, все это нужно будет выкинуть отсюда
 
+                index = ch * len(
+                    products) * len_customers * period_length + prod * len_customers * period_length + cust * period_length + day
+                print('index for this test is', index)
+                print('A[index] = {}'.format(A[index]))
+
+                # ищем последнюю коммуникацию с данным клиентом, чтобы понять, насколько все плохо
+
+                for item in opt_hist:
+                    if item[0] == cust:
+                        check3_info += '\nThe last communication with customer {} was on day {} (channel {}, product {})'.format(
+                            cust, item[1], item[2], item[3])
+                        # TODO: для отладки нужна не только последняя коммуникация с клиентом, она нужна еще и по тому же каналу
+                        break
+                print()
+
+                #  Выводим все неравенства, содержащие переменную, не прошедшую тест
+                inequalities = dict()
+
+                # проходимся по неравенствам и запоминаем, какие из них содержат переменные, которые хотим посмотреть
+                for n in range(len(G_i)):
+                    i = G_j[n] // period_length // len_customers // len(products)
+                    j = G_j[n] // period_length // len_customers % len(products)
+                    k = G_j[n] // period_length % len_customers
+                    d = G_j[n] % period_length
+
+                    if i == ch and j == prod and k == cust and d == day:
+                        # inequalities[inequality_id] = ('x_i{}_j{}_k{}_d{} + '.format(i, j, k, d))
+                        inequalities[G_i[n]] = list()
+
+                # проходимся по переменным, и смотрим есть ли она в неравенстве, которое хотим посмотреть
+                for inequality_item in range(len(G_j)):
+                    if G_i[inequality_item] in inequalities.keys():
+                        inequalities[G_i[inequality_item]].append(G_j[inequality_item])
+
+                # восстанавливаем четырехмерность каждого индекса
+                for value in inequalities.values():
+                    for n in range(len(value)):
+                        i = value[n] // period_length // len_customers // len(products)
+                        j = value[n] // period_length // len_customers % len(products)
+                        k = value[n] // period_length % len_customers
+                        d = value[n] % period_length
+                        value[n] = 'x_i{}j{}k{}d{}'.format(i, j, k, d)
+
+                # вывод неравенств
+                print('Total inequalities: {}.'.format(len(inequalities)))
+                for k, v in inequalities.items():
+                    print('Inequality {} ({} слагаемых): {} {}'.format(k, len(v), v,
+                                                                       'Empty inequality' if len(v) == 0 else '< 1'))
+                # TODO: вывести уравнения
+
+                break
+            else:
+                print(
+                    'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
+                                                                                                        communications_channel[
+                                                                                                            cust][ch],
+                                                                                                        '\033[32mOK (x={})\033[0m'.format(
+                                                                                                            output[test_id][
+                                                                                                                6]),
+                                                                                                        test_id, non_zeros))
+
+                # Если же ограничения не было и коммуникация произошла, добавляем ее в историю оптимизации...
+                opt_hist.append([cust, day, ch, prod])
+                # ... и ставим новое ограничение из МКП
+                for i in range(len(channels)):
+                    if matrix_channel[ch][i] > communications_channel[cust][i]:
+                        communications_channel[cust][i] = matrix_channel[ch][i]
+
+        else:
+            print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
+                                                                                                      communications_channel[
+                                                                                                          cust][
+                                                                                                          ch],
+                                                                                                      '\033[32mOK (x={})\033[0m'.format(
+                                                                                                          output[test_id][
+                                                                                                              6]),
+                                                                                                      test_id, non_zeros))
+
+    if check3_flag:
+        print('Check 2 is submitted.', check3_info)
     else:
-        print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
-                                                                                                  communications_channel[
-                                                                                                      cust][
-                                                                                                      ch],
-                                                                                                  '\033[32mOK (x={})\033[0m'.format(
-                                                                                                      output[test_id][
-                                                                                                          6]),
-                                                                                                  test_id, non_zeros))
+        print('\033[31mCheck 2 is not submitted.\033[0m', check3_info)
 
-if check2_flag:
-    print('Check 2 is submitted.', check2_info)
-else:
-    print('\033[31mCheck 2 is not submitted.\033[0m', check2_info)
+    if ask('Wanna see opt_hist?'):
+        # генерируем таблицу истории оптимизации до проваленного теста (она будет выведена в обратном порядке)
+        table_opt_hist = PrettyTable(['surrogate_customer_id', 'relative date', 'channel_code', 'product_code'])
+        for item in opt_hist:
+            table_opt_hist.add_row(item)
 
-# TODO: check3: matrix product
+        # print('REVERSED Full optimization history {}'.format('' if check2_flag else '(until failed test)'))
+        # print(table_opt_hist)
 
-# TODO: check4: constraint ratio product
+        # output.sort(key=itemgetter(0))  # восстановление изначального порядка иксов в output
+        # print("FROM output[]:")
+        # for j in range(len(products)):
+        #     i = 0
+        #     k = 91
+        #     d = 0
+        #     index = i * len(
+        #         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+        #     print(output[index][6], '(index = {})'.format(index))
+
+# TODO: check4: matrix product
+
+print('\n' + 'Step 4: matrix product')
+print('\033[31mNot ready yet\033[0m')
+
+# TODO: check5: constraint ratio product
+
+print('\n' + 'Step 5: constraint ratio product')
+print('\033[31mNot ready yet\033[0m')
 
 # собираем целевую функцию
 objective = 0.0
@@ -636,25 +710,6 @@ for item in output:
     objective += -item[5] * item[6]
 
 print("Final objective function: {}".format(objective))
-
-# генерируем таблицу истории оптимизации до проваленного теста (она будет выведена в обратном порядке)
-table_opt_hist = PrettyTable(['surrogate_customer_id', 'relative date', 'channel_code', 'product_code'])
-for item in opt_hist:
-    table_opt_hist.add_row(item)
-
-
-# print('REVERSED Full optimization history {}'.format('' if check2_flag else '(until failed test)'))
-# print(table_opt_hist)
-
-# output.sort(key=itemgetter(0))  # восстановление изначального порядка иксов в output
-# print("FROM output[]:")
-# for j in range(len(products)):
-#     i = 0
-#     k = 91
-#     d = 0
-#     index = i * len(
-#         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-#     print(output[index][6], '(index = {})'.format(index))
 
 
 # функция, выводящая только желаемые корни в отформатированном виде
