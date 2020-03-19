@@ -94,7 +94,7 @@ with open('constraint_absolute_channel.csv') as f:
     reader = csv.reader(f)
     constraint_absolute_channel = list(reader)
 
-    # limits conversion
+    # преобразование границ
     for item in constraint_absolute_channel:
         item[0] = channels.index(item[0])
 
@@ -109,6 +109,28 @@ with open('constraint_absolute_channel.csv') as f:
             item[2] = int(item[2])
 
     constraint_absolute_channel.sort(key=itemgetter(0))  # sort by channel_id
+
+with open('constraint_absolute_product.csv') as f:
+    reader = csv.reader(f)
+    constraint_absolute_product = list(reader)
+
+    # преобразование границ
+    for item in constraint_absolute_product:
+        for info in products:
+            if item[0] in info:
+                item[0] = products.index(info)
+
+                if item[1] == '.':
+                    item[1] = 0
+                else:
+                    item[1] = int(item[1])
+
+                if item[2] == ".":
+                    item[2] = float("inf")
+                else:
+                    item[2] = int(item[2])
+
+    constraint_absolute_product.sort(key=itemgetter(0))  # sort by channel_id
 
 
 # Useful functions for dictionary_model conversion
@@ -160,6 +182,8 @@ print("Matrix_Channel ({} items):".format(len(matrix_channel)), matrix_channel[:
 print("Matrix_Product ({} items):".format(len(matrix_product)), matrix_product[:3], "...")
 print("Constraint_Absolute_Channel: ({} items):".format(len(constraint_absolute_channel)),
       constraint_absolute_channel[:3], "...")
+print("Constraint_Absolute_Product: ({} items):".format(len(constraint_absolute_product)),
+      constraint_absolute_product[:3], "...")
 
 print("Start Date:", start_date)
 print("Period Length: {} days".format(period_length))
@@ -506,7 +530,7 @@ print('\n' + 'CHECKING CONSTRAINTS')
 def ask(q='Start?'):
     print(q, '[Y/n]')
     response = input()
-    return response == 'Y'
+    return response.upper() == 'Y'
 
 
 print('\n' + 'Step 1: constraints absolute channel')
@@ -517,27 +541,28 @@ if ask():
 
     for item in output:
         this_channel = item[1]
-        check1[this_channel] += item[6]
+        check1[this_channel] += int(item[6])
 
     for ch in range(len(channels)):
         print('Total {}: {} ({})'.format(channels[ch], check1[ch],
                                          'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
                                                       constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
 
-print('\n' + 'Step 2: constraints absolute channel')
+print('\n' + 'Step 2: constraints absolute product')
 if ask():
     check2 = []
-    for ch in channels:
+    for prod in products:
         check2.append(0)
 
     for item in output:
-        this_channel = item[1]
-        check2[this_channel] += item[6]
+        this_product = item[2]
+        check2[this_product] += int(item[6]) # item[6] - это x
 
-    for ch in range(len(channels)):
-        print('Total {}: {} ({})'.format(channels[ch], check2[ch],
-                                         'Correct' if constraint_absolute_channel[ch][1] <= check2[ch] <=
-                                                      constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
+    for prod in range(len(products)):
+        print('Total {}: {} ({})'.format(products[prod], check2[prod],
+                                         'Correct' if constraint_absolute_product[prod][1]
+                                                      <= check2[prod] <=
+                                                      constraint_absolute_product[prod][2] else '\033[31mIncorrect\033[0m'))
 
 print('\n' + 'Step 3: matrix channel')
 if ask():
