@@ -175,7 +175,7 @@ with open('constraint_ratio_product.csv') as f:
         else:
             item[2] = float(item[2])
 
-    constraint_ratio_channel.sort(key=itemgetter(0))
+    constraint_ratio_product.sort(key=itemgetter(0))
 
 with open('constraint_days_from_start.csv') as f:
     reader = csv.reader(f)
@@ -798,9 +798,17 @@ print('\033[31mNot ready yet\033[0m')
 # TODO: check6: constraint ratio product
 
 print('\n' + 'Step 6: constraint ratio product')
-print('\033[31mNot ready yet\033[0m')
+product_ratio = list(np.zeros(len(products)))
 
-product_ratio = list()
+for p in range(len(output)):
+    product_ratio[output[p][2]] += output[p][6]
+
+total = sum(product_ratio)
+product_ratio = [item / total for item in product_ratio]
+
+for prod in range(len(products)):
+    print('Ratio for product {}: {} ({})'.format(ref_products[prod], product_ratio[prod],
+                                                 'Correct' if constraint_ratio_product[prod][1] <= product_ratio[prod] <= constraint_ratio_product[prod][2] else '\033[31m' + 'Incorrect' + '\033[m'))
 
 # TODO: check7: days from start
 
@@ -818,6 +826,7 @@ if ask():
                         check7_flag = False
                         break
 
+# TODO: check8: channel importance (надо смотреть наибольшие мат. ожидания в данный канал-клиент-день и смотреть, чтобы из них было выбрано нужное)
 
 # собираем целевую функцию
 objective = 0.0
@@ -827,7 +836,7 @@ for item in output:
 print("Final objective function: {}".format(objective))
 
 
-# функция, выводящая только желаемые корни в отформатированном виде
+# кривая функция, выводящая только желаемые корни в отформатированном виде
 def print_roots(ch=None, prod=None, cust=None, day=None):
     table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
     if isinstance(id, list):
