@@ -135,7 +135,47 @@ with open('constraint_absolute_product.csv') as f:
                 else:
                     item[2] = int(item[2])
 
-    constraint_absolute_product.sort(key=itemgetter(0))  # sort by channel_id
+    constraint_absolute_product.sort(key=itemgetter(0))  # sort by product_id
+
+with open('constraint_ratio_channel.csv') as f:
+    reader = csv.reader(f)
+    constraint_ratio_channel = list(reader)
+
+    # преобразование границ
+    for item in constraint_ratio_channel:
+        item[0] = channels.index(item[0])
+
+        if item[1] == '.':
+            item[1] = 0.0
+        else:
+            item[1] = float(item[1])
+
+        if item[2] == ".":
+            item[2] = 1.0
+        else:
+            item[2] = float(item[2])
+
+    constraint_ratio_channel.sort(key=itemgetter(0))
+
+with open('constraint_ratio_product.csv') as f:
+    reader = csv.reader(f)
+    constraint_ratio_product = list(reader)
+
+    # преобразование границ
+    for item in constraint_ratio_product:
+        item[0] = ref_products.index(item[0])
+
+        if item[1] == '.' or item[1] == '':
+            item[1] = 0.0
+        else:
+            item[1] = float(item[1])
+
+        if item[2] == "." or item[2] == '':
+            item[2] = 1.0
+        else:
+            item[2] = float(item[2])
+
+    constraint_ratio_channel.sort(key=itemgetter(0))
 
 with open('constraint_days_from_start.csv') as f:
     reader = csv.reader(f)
@@ -145,6 +185,11 @@ with open('constraint_days_from_start.csv') as f:
             line[1] = 0
         constraint_days_from_start[ref_products.index(line[0])] = int(line[1])
 
+with open('channel_importance.csv') as f:
+    reader = csv.reader(f)
+    channel_importance = list(np.zeros(len(channels)))
+    for item in list(reader):
+        channel_importance[int(item[0])] = int(item[1])
 
 # Useful functions for dictionary_model conversion
 
@@ -198,6 +243,12 @@ print("Constraint_Absolute_Channel: ({} items):".format(len(constraint_absolute_
       constraint_absolute_channel[:3], "...")
 print("Constraint_Absolute_Product: ({} items):".format(len(constraint_absolute_product)),
       constraint_absolute_product[:3], "...")
+print("Constraint_Ratio_Channel: ({} items):".format(len(constraint_ratio_channel)),
+      constraint_ratio_channel[:3], "...")
+print("Constraint_Ratio_Product: ({} items):".format(len(constraint_ratio_product)),
+      constraint_ratio_product[:3], "...")
+print("Channel_Importance ({} items):".format(len(channel_importance)), channel_importance[:3], "...")
+
 print("Constraint_Days_From_Start ({} items):".format(len(constraint_days_from_start)), constraint_days_from_start[:3], "...")
 
 print("Start Date:", start_date)
@@ -748,6 +799,8 @@ print('\033[31mNot ready yet\033[0m')
 
 print('\n' + 'Step 6: constraint ratio product')
 print('\033[31mNot ready yet\033[0m')
+
+product_ratio = list()
 
 # TODO: check7: days from start
 
