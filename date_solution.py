@@ -20,10 +20,15 @@ with open('model.csv', 'r') as f:
 with open('products.csv', 'r') as f:
     reader = csv.reader(f)
     products = list(reader)
+
     for product in products:
         product[0] = int(product[0])
         product[2] = float(product[2])
     products.sort(key=itemgetter(0))
+
+    ref_products = list()  # это вспомогательный лист, содержит только имена продуктов, часто используеся, тяжело без ООП живется
+    for product in products:
+        ref_products.append(product[1])
 
 with open('scores.csv', 'r') as f:
     reader = csv.reader(f)
@@ -132,6 +137,14 @@ with open('constraint_absolute_product.csv') as f:
 
     constraint_absolute_product.sort(key=itemgetter(0))  # sort by channel_id
 
+with open('constraint_days_from_start.csv') as f:
+    reader = csv.reader(f)
+    constraint_days_from_start = list(np.zeros(len(products))) # list содержит столько же нулей, сколько есть продуктов
+    for line in list(reader):
+        if line[1] == '':
+            line[1] = 0
+        constraint_days_from_start[ref_products.index(line[0])] = int(line[1])
+
 
 # Useful functions for dictionary_model conversion
 
@@ -163,6 +176,7 @@ def product_by_model(model_code):
 
 print("Dict_Model ({} items):".format(len(dict_model)), dict_model[:3], "...")
 print("Products ({} items):".format(len(products)), products[:3], "...")
+print("Ref_Products ({} items):".format(len(ref_products)), ref_products[:3], "...")
 print("Channels ({} items):".format(len(channels)), channels[:3], "...")
 print("Scores ({} items):".format(len(scores)), scores[:3], "...")
 print('\n')
@@ -184,6 +198,7 @@ print("Constraint_Absolute_Channel: ({} items):".format(len(constraint_absolute_
       constraint_absolute_channel[:3], "...")
 print("Constraint_Absolute_Product: ({} items):".format(len(constraint_absolute_product)),
       constraint_absolute_product[:3], "...")
+print("Constraint_Days_From_Start ({} items):".format(len(constraint_days_from_start)), constraint_days_from_start[:3], "...")
 
 print("Start Date:", start_date)
 print("Period Length: {} days".format(period_length))
@@ -724,10 +739,32 @@ if ask():
 print('\n' + 'Step 4: matrix product')
 print('\033[31mNot ready yet\033[0m')
 
-# TODO: check5: constraint ratio product
+# TODO: check5: constraint ratio channel
 
-print('\n' + 'Step 5: constraint ratio product')
+print('\n' + 'Step 5: constraint ratio channel')
 print('\033[31mNot ready yet\033[0m')
+
+# TODO: check6: constraint ratio product
+
+print('\n' + 'Step 6: constraint ratio product')
+print('\033[31mNot ready yet\033[0m')
+
+# TODO: check7: days from start
+
+print('\n' + 'Step 7: days from start')
+check7_flag = True
+if ask():
+    for prod in range(len(products)):
+        if constraint_days_from_start[prod] == 0:
+            print('Product {}: \033[32mtest is passed\033[0m'.format(ref_products[prod]))
+        else:
+            for p in range(len(output)):
+                if output[p][2]: # if x[p] - коммуникация по продукту prod
+                    if x[p] == 1.0 and output[p][4] < constraint_days_from_start[prod]:
+                        print('Product {}: \033[31mtest failed\033[0m on x[{}] (day {})'.format(ref_products[prod], p, output[p][4]))
+                        check7_flag = False
+                        break
+
 
 # собираем целевую функцию
 objective = 0.0
