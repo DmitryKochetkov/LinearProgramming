@@ -1,9 +1,14 @@
 import csv
 from datetime import datetime, timedelta
-from random import randint, triangular
+from random import randint, triangular, randrange, random, seed
+
+from array_functions import *
+from operator import itemgetter
 
 channels = 0
 products = 0
+
+seed()
 
 with open('channels.csv', 'r') as f:
     reader = csv.reader(f)
@@ -14,6 +19,14 @@ with open('products.csv', 'r') as f:
     reader = csv.reader(f)
     for line in reader:
         products += 1
+
+with open('parameters.csv', 'r') as f:
+    reader = csv.reader(f)
+    parameters = list(reader)
+    start_date = parameters[0][0]
+    period_length = parameters[0][1]
+    start_date = datetime.strptime(start_date, '%m/%d/%Y')
+    period_length = int(period_length)
 
 with open('model.csv', 'r') as f:
     reader = csv.reader(f)
@@ -51,8 +64,9 @@ with open('scores.csv', 'r') as f:
 
     if len_customers > desired_clients:
         for i in range(len(scores)):
-            if score[i][0] > desired_clients:
+            if scores[i][0] == desired_clients:
                 scores = scores[:i-1]
+                print('Scores truncated')
                 break
 
     #  если клиентов в scores меньше чем требуется, то генерируем клиентов с случайными model и вероятностью
@@ -67,6 +81,8 @@ with open('scores.csv', 'r') as f:
 #     writer = csv.writer(f)
 #     writer.writerows(scores)
 
+creation_of_the_world = start_date
+
 with open('hist.csv', 'r') as f:
     reader = csv.reader(f)
     hist = list(reader)
@@ -75,3 +91,38 @@ with open('hist.csv', 'r') as f:
         item[2] = int(item[2])
         item[3] = int(item[3])
         item[1] = datetime.strptime(item[1], '%m/%d/%Y %H:%M')
+        if item[1] < creation_of_the_world:
+            creation_of_the_world = item[1]
+
+        # ID из истории нормализуются, т.е. сопоставляются с ID в dict_model
+
+    last_id = -1
+    last_surrogate_id = -1
+
+    hist.sort(key=itemgetter(0))
+
+    for item in hist:
+        if item[0] > last_id:
+            last_surrogate_id += 1
+        last_id = item[0]
+        item[0] = last_surrogate_id
+
+    if last_surrogate_id > desired_clients:
+        for i in range(len(hist)):
+            if hist[i][0] > desired_clients:
+                hist = hist[:i-1]
+                print('Hist truncated')
+                break
+
+    if last_surrogate_id < desired_clients:
+        for k in range(desired_clients - last_surrogate_id, desired_clients):
+            for n in range(randint(3, 8)): # генерируем сколько-нибудь коммуникаций от 3 до 8
+                d = randrange((start_date - creation_of_the_world).days - 1) # в дату от "сотворения мира" до начала оптимизации
+                d = start_date + timedelta(days=d)
+                if randint(0, 1) == 1:
+                    hist.append([k, d, randint(0, channels - 1), randint(0, products - 1)]) # случайную коммуникацию
+                    print('Hist: добавлена запись [cust_id {}, day {}, channel {}, product {}]'.format(hist[-1][0], hist[-1][1], hist[-1][2], hist[-1][3]))
+
+# with open('hist_generated.csv', "w") as f:
+#     writer = csv.writer(f)
+#     writer.writerows(hist)
