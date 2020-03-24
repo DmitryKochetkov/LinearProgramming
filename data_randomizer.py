@@ -77,9 +77,10 @@ with open('scores.csv', 'r') as f:
                     scores.append([k, m, round(triangular(min_probability, max_probability), 5)])
                     print('Scores: добавлена запись [cust_id {}, model {}, probability = {}]'.format(scores[-1][0], scores[-1][1], scores[-1][2]))
 
-# with open('scores_generated.csv', "w") as f:
-#     writer = csv.writer(f)
-#     writer.writerows(scores)
+with open('scores_generated.csv', "w") as f:
+    writer = csv.writer(f)
+    f.truncate()
+    writer.writerows(scores)
 
 creation_of_the_world = start_date
 
@@ -118,11 +119,15 @@ with open('hist.csv', 'r') as f:
         for k in range(desired_clients - last_surrogate_id, desired_clients):
             for n in range(randint(3, 8)): # генерируем сколько-нибудь коммуникаций от 3 до 8
                 d = randrange((start_date - creation_of_the_world).days - 1) # в дату от "сотворения мира" до начала оптимизации
-                d = start_date + timedelta(days=d)
+                d = start_date + timedelta(days=d, seconds=1)
                 if randint(0, 1) == 1:
                     hist.append([k, d, randint(0, channels - 1), randint(0, products - 1)]) # случайную коммуникацию
                     print('Hist: добавлена запись [cust_id {}, day {}, channel {}, product {}]'.format(hist[-1][0], hist[-1][1], hist[-1][2], hist[-1][3]))
 
-# with open('hist_generated.csv', "w") as f:
-#     writer = csv.writer(f)
-#     writer.writerows(hist)
+for item in hist:
+    item[1] = item[1].strftime('%m/%d/%Y %H:%M')
+
+with open('hist_generated.csv', "w") as f:
+    writer = csv.writer(f)
+    f.truncate()
+    writer.writerows(hist)
