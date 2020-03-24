@@ -430,7 +430,7 @@ for p in range(len(model_1d)):
         c.append(model_1d[p])
         output.append([p * period_length + d, i, j, k, d, model_1d[p], '?'])
 
-# ограничения на общее количество коммуникаций по каналу TODO: решить, что делать с нижней границей
+# ограничения на общее количество коммуникаций по каналу сверху
 
 for i in range(len(channels)):
     G_x.extend(np.ones(len(products) * len_customers * period_length, dtype=float).tolist())
@@ -460,6 +460,10 @@ for i in range(len(channels)):
 b = [0.0]
 
 # ограничения из МКП по каналам
+# TODO: выставить приоритет каналов (по идее это должно быть здесь же, а не отдельным неравенством)
+# может надо всего-то range(len(channels)) заменить на range(channel_importance)? хотя порядок вряд ли так сильно влияет
+# а еще можно добавлять мат.ожидания как коэффициенты в неравенстве!!!
+# типа model * x_i0j0k91d0 + model * x_i1j0k91d0 + model * x_i2j0k91d0 + model * x_i3j0k91d0 < что-то там
 
 neq = G_i[-1] + 1  # номер последней строки матрицы коэффициентов неравенства
 
@@ -516,6 +520,7 @@ neq = G_i[-1] + 1  # номер последней строки матрицы �
 #         h.append(1.0)
 #         neq += 1
 
+# another try
 for k in range(len_customers):
     for d in range(period_length):
 
@@ -544,6 +549,70 @@ for k in range(len_customers):
         h.append(1.0)
         neq += 1
 
+# ограничения на долю продукта снизу
+
+for prod in range(len(products)):
+    if constraint_ratio_product[prod][1] != 0:
+        inequality_x = list()
+        inequality_i = list()
+        inequality_j = list()
+
+        for i in range(len(channels)):
+            for j in range(len(products)):
+                for k in range(len_customers):
+                    for d in range(period_length):
+                        index = i * len(products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+                        if j == prod:
+                            inequality_x.append(-1 + constraint_ratio_product[prod][1])
+                        else:
+                            inequality_x.append(constraint_ratio_product[prod][1])
+
+                        inequality_i.append(neq)
+                        inequality_j.append(index)
+
+        G_x.extend(inequality_x)
+        G_i.extend(inequality_i)
+        G_j.extend(inequality_j)
+        h.append(0.0)
+        neq += 1
+
+# TODO: раскомментировать ограничения на долю продукта сверху
+
+# for prod in range(len(products)):
+#     inequality_x = list()
+#     inequality_i = list()
+#     inequality_j = list()
+#
+#     for i in range(len(channels)):
+#         for j in range(len(products)):
+#             for k in range(len_customers):
+#                 for d in range(period_length):
+#                     index = i * len(products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+#                     if j == prod:
+#                         inequality_x.append(1 - constraint_ratio_product[prod][2])
+#                     else:
+#                         inequality_x.append(-constraint_ratio_product[prod][2])
+#
+#                     inequality_i.append(neq)
+#                     inequality_j.append(index)
+#
+#     G_x.extend(inequality_x)
+#     G_i.extend(inequality_i)
+#     G_j.extend(inequality_j)
+#     h.append(0.0)
+#     neq += 1
+
+# ограничения на количество дней со старта оптимизации
+
+for i in range(len(channels)):
+    for j in range(len(products)):
+        for k in range(len_customers):
+            for d in range(period_length):
+                index = i * len(
+                    products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+                if d < constraint_days_from_start[j]:
+                    A[index] = 1.0
+
 print(len(G_x))
 print(len(G_i))
 print(len(G_j))
@@ -555,12 +624,6 @@ G = spmatrix(G_x, G_i, G_j)
 h = matrix(h)
 A = matrix(A).trans()
 b = matrix(b)
-
-# TODO: попробовать уменьшить количество неравенств, подаваемых на вход оптимизатору
-# amount = 500
-# G.
-# G = G[:amount] # придумать способ с разреженной матрицей
-# h = h[:amount]
 
 print('Sizes')
 print('c: ', c.size)
@@ -629,6 +692,8 @@ if ask():
                                          'Correct' if constraint_absolute_product[prod][1]
                                                       <= check2[prod] <=
                                                       constraint_absolute_product[prod][2] else '\033[31mIncorrect\033[0m'))
+
+# check 3: matrix_channel
 
 print('\n' + 'Step 3: matrix channel')
 if ask():
@@ -790,27 +855,39 @@ if ask():
 print('\n' + 'Step 4: matrix product')
 print('\033[31mNot ready yet\033[0m')
 
-# TODO: check5: constraint ratio channel
+# check5: constraint ratio channel
 
 print('\n' + 'Step 5: constraint ratio channel')
-print('\033[31mNot ready yet\033[0m')
+if ask():
+    channel_ratio = list(np.zeros(len(channels)))
 
-# TODO: check6: constraint ratio product
+    for p in range(len(output)):
+        channel_ratio[output[p][1]] += output[p][6]
+
+    total = sum(channel_ratio)
+    channel_ratio = [item / total for item in channel_ratio]
+
+    for ch in range(len(channels)):
+        print('Ratio for product {}: {} ({})'.format(channels[ch], channel_ratio[ch],
+                                                     'Correct' if constraint_ratio_channel[ch][1] <= channel_ratio[ch] <= constraint_ratio_channel[ch][2] else '\033[31m' + 'Incorrect' + '\033[m'))
+
+# check6: constraint ratio product
 
 print('\n' + 'Step 6: constraint ratio product')
-product_ratio = list(np.zeros(len(products)))
+if ask():
+    product_ratio = list(np.zeros(len(products)))
 
-for p in range(len(output)):
-    product_ratio[output[p][2]] += output[p][6]
+    for p in range(len(output)):
+        product_ratio[output[p][2]] += output[p][6]
 
-total = sum(product_ratio)
-product_ratio = [item / total for item in product_ratio]
+    total = sum(product_ratio)
+    product_ratio = [item / total for item in product_ratio]
 
-for prod in range(len(products)):
-    print('Ratio for product {}: {} ({})'.format(ref_products[prod], product_ratio[prod],
-                                                 'Correct' if constraint_ratio_product[prod][1] <= product_ratio[prod] <= constraint_ratio_product[prod][2] else '\033[31m' + 'Incorrect' + '\033[m'))
+    for prod in range(len(products)):
+        print('Ratio for product {}: {} ({})'.format(ref_products[prod], product_ratio[prod],
+                                                     'Correct' if constraint_ratio_product[prod][1] <= product_ratio[prod] <= constraint_ratio_product[prod][2] else '\033[31m' + 'Incorrect' + '\033[m'))
 
-# TODO: check7: days from start
+# check7: days from start
 
 print('\n' + 'Step 7: days from start')
 check7_flag = True
@@ -826,14 +903,37 @@ if ask():
                         check7_flag = False
                         break
 
-# TODO: check8: channel importance (надо смотреть наибольшие мат. ожидания в данный канал-клиент-день и смотреть, чтобы из них было выбрано нужное)
+# TODO: check8: channel importance
+print('\n' + 'Step 8: channel priority')
+# надо смотреть наибольшие мат. ожидания по каналам в данный продукт-клиент-день и смотреть, чтобы из них было выбрано нужное)
+if ask():
+    for j in range(len(products)):
+        for k in range(len_customers):
+            for d in range(period_length):
+
+                # эта проверка основывается еще и на том факте, что в данный день возможна только одна коммуникация с клиентом
+
+                # ищем мат.ожидание истинного икса
+                expectation = -1
+                for i in range(len(channels)):
+                    index = i * len(products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+                    if x[index] == 1.0:
+                        expectation = model[i][j][k]
+
+                # проходимся по каналам в порядке приоритета
+                for i in range(len(channel_importance)):
+                    index = i * len(
+                        products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+                    #if model[i][j][k] == expectation and x не приоритетный то тут мои полномочия все, кончились:
+
+
 
 # собираем целевую функцию
 objective = 0.0
 for item in output:
     objective += -item[5] * item[6]
 
-print("Final objective function: {}".format(objective))
+print("Objective function: {}".format(objective))
 
 
 # кривая функция, выводящая только желаемые корни в отформатированном виде
