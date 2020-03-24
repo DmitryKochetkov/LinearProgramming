@@ -309,7 +309,7 @@ for i in range(len(hist)):
 
 hist = hist[:normalized_len]
 
-# Сортируем истории в хронологическом порядке (по датам)
+# Сортируем историю в хронологическом порядке (по датам)
 hist.sort(key=itemgetter(1))
 
 
@@ -392,18 +392,6 @@ for k in range(len(communications_channel)):
 # теперь получены cтартовые ограничения из истории (пока только для МКП по каналам)
 
 # РЕШЕНИЕ
-
-# Здесь прототип фичи для возможности выбора ограничений пользователем
-# TODO: раскомментировать, когда все будет готово
-
-# matrix_channel_on = True
-# print('Turn off matrix_channel? [Y/n]')
-# if input() == 'Y':
-#     matrix_channel_on = False
-# print('Turn off matrix_product? [Y/n]')
-
-# if matrix_channel_on == False:
-#
 
 output = []  # отдельный двумерный список для красивого вывода, каждая его строка помещается в красивую табличку
 
@@ -550,7 +538,6 @@ for k in range(len_customers):
         neq += 1
 
 # ограничения на долю продукта снизу
-
 for prod in range(len(products)):
     if constraint_ratio_product[prod][1] != 0:
         inequality_x = list()
@@ -576,7 +563,7 @@ for prod in range(len(products)):
         h.append(0.0)
         neq += 1
 
-# TODO: раскомментировать ограничения на долю продукта сверху
+# TODO: раскомментировать ограничения на долю продукта сверху:
 
 # for prod in range(len(products)):
 #     inequality_x = list()
