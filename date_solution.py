@@ -473,7 +473,7 @@ for i in range(len(channels)):
             for d in range(period_length):
                 index = i * len(
                     products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-                if d < communications_channel[k][i]:
+                if d < communications_channel[k][i] or d < communications_product[k][j]:
                     A[index] = 1.0
 
 b = [0.0]
@@ -485,61 +485,6 @@ b = [0.0]
 # типа model * x_i0j0k91d0 + model * x_i1j0k91d0 + model * x_i2j0k91d0 + model * x_i3j0k91d0 < что-то там
 
 neq = G_i[-1] + 1  # номер последней строки матрицы коэффициентов неравенства
-
-# for k in range(len_customers):
-#     for d in range(period_length):
-#
-#         for i in range(len(channels)):
-#             inequality_x = list()
-#             inequality_i = list()
-#             inequality_j = list()
-#
-#             for j in range(len(products)):
-#                 for ch2 in range(len(channels)):
-#                     for T in range(min(matrix_channel[i][ch2], period_length)):
-#                         if d + T < period_length:
-#                             index = ch2 * len(
-#                                 products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
-#                             inequality_x.append(1.0)
-#                             inequality_i.append(neq)
-#                             inequality_j.append(index)
-#
-#             G_x.extend(inequality_x)
-#             G_i.extend(inequality_i)
-#             G_j.extend(inequality_j)
-#             h.append(1.0)
-#             neq += 1
-
-# FIRST SUCCESSFUL TRY
-# for k in range(len_customers):
-#     for d in range(period_length):
-#
-#         inequality_x = list()
-#         inequality_i = list()
-#         inequality_j = list()
-#
-#         for i in range(len(channels)):
-#             T_max = 0
-#             for ch2 in range(len(channels)):
-#                 if matrix_channel[i][ch2] > T_max:
-#                     T_max = matrix_channel[i][ch2]
-#
-#             for j in range(len(products)):
-#                 for T in range(min(T_max, period_length)):
-#                     if d + T < period_length:
-#                         index = i * len(
-#                             products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
-#                         inequality_x.append(1.0)
-#                         inequality_i.append(neq)
-#                         inequality_j.append(index)
-#
-#         G_x.extend(inequality_x)
-#         G_i.extend(inequality_i)
-#         G_j.extend(inequality_j)
-#         h.append(1.0)
-#         neq += 1
-
-# another try
 for k in range(len_customers):
     for d in range(period_length):
 
@@ -568,7 +513,37 @@ for k in range(len_customers):
         h.append(1.0)
         neq += 1
 
+# ограничения из МКП по продуктам
+for k in range(len_customers):
+    for d in range(period_length):
+
+        inequality_x = list()
+        inequality_i = list()
+        inequality_j = list()
+
+        for j in range(len(products)):
+            T_max = 0
+            for prod2 in range(len(products)):
+                if matrix_product[j][prod2] > T_max:
+                    T_max = matrix_product[j][prod2]
+
+            for i in range(len(channels)):
+                for T in range(min(T_max, period_length)):
+                    if d + T < period_length:
+                        index = i * len(
+                            products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d + T
+                        inequality_x.append(1.0)
+                        inequality_i.append(neq)
+                        inequality_j.append(index)
+
+        G_x.extend(inequality_x)
+        G_i.extend(inequality_i)
+        G_j.extend(inequality_j)
+        h.append(1.0)
+        neq += 1
+
 # ограничения на долю продукта снизу
+# TODO: раскомментировать
 # for prod in range(len(products)):
 #     if constraint_ratio_product[prod][1] != 0:
 #         inequality_x = list()
@@ -874,16 +849,16 @@ if ask():
         if day > output[test_id - 1][4]:
             print('Day', day)
             for k in range(len_customers):
-                for i in range(len(channels)):
-                    if communications_channel[k][i] > 0:
-                        communications_channel[k][i] -= 1
+                for j in range(len(products)):
+                    if communications_product[k][j] > 0:
+                        communications_product[k][j] -= 1
 
         if this_x != 0.0:
             non_zeros += 1
 
         if this_x == 1.0:
             # Если коммуникация произошла вопреки ограничению, то тест не пройден.
-            if communications_channel[cust][ch] > 0:
+            if communications_product[cust][prod] > 0:
                 check4_flag = False
                 check4_info = 'Constraint failed for customer {} at channel {} at product {} at day {}. Product was forbidden for {} ' \
                               'days more. Additional: communication_id = {}, x = {}, p = {}'.format(cust, ch, prod, day,
@@ -1069,7 +1044,7 @@ if ask():
             print('Product {}: \033[32mOK\033[0m'.format(ref_products[prod]))
 
 
-# TODO: check8: channel importance
+# check8: channel importance
 print('\n' + 'Step 8: channel priority')
 # надо смотреть наибольшие мат. ожидания по каналам в данный продукт-клиент-день и смотреть, чтобы из них было выбрано нужное)
 if ask():
