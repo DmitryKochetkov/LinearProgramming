@@ -30,7 +30,7 @@ with open('products.csv', 'r') as f:
     for product in products:
         ref_products.append(product[1])
 
-#with open('scores.csv', 'r') as f:
+# with open('scores.csv', 'r') as f:
 with open('scores_generated.csv', 'r') as f:
     reader = csv.reader(f)
     scores = list(reader)
@@ -45,7 +45,7 @@ with open('channels.csv', 'r') as f:
     for i in range(0, len(channels)):
         channels[i] = channels[i][0]
 
-#with open('hist.csv', 'r') as f:
+# with open('hist.csv', 'r') as f:
 with open('hist_generated.csv', 'r') as f:
     reader = csv.reader(f)
     hist = list(reader)
@@ -189,7 +189,7 @@ with open('constraint_ratio_product.csv') as f:
 
 with open('constraint_days_from_start.csv') as f:
     reader = csv.reader(f)
-    constraint_days_from_start = list(np.zeros(len(products))) # list содержит столько же нулей, сколько есть продуктов
+    constraint_days_from_start = list(np.zeros(len(products)))  # list содержит столько же нулей, сколько есть продуктов
     for line in list(reader):
         if line[1] == '':
             line[1] = 0
@@ -200,6 +200,7 @@ with open('channel_importance.csv') as f:
     channel_importance = list(np.zeros(len(channels)))
     for item in list(reader):
         channel_importance[int(item[0])] = int(item[1])
+
 
 # Useful functions for dictionary_model conversion
 
@@ -259,7 +260,8 @@ print("Constraint_Ratio_Product: ({} items):".format(len(constraint_ratio_produc
       constraint_ratio_product[:3], "...")
 print("Channel_Importance ({} items):".format(len(channel_importance)), channel_importance[:3], "...")
 
-print("Constraint_Days_From_Start ({} items):".format(len(constraint_days_from_start)), constraint_days_from_start[:3], "...")
+print("Constraint_Days_From_Start ({} items):".format(len(constraint_days_from_start)), constraint_days_from_start[:3],
+      "...")
 
 print("Start Date:", start_date)
 print("Period Length: {} days".format(period_length))
@@ -352,7 +354,6 @@ def print_communications_channel(cust=None):
 # communications_channel будет содержать данные об ограничениях из истории до дня начала оптимизации
 # Суть: Коммуникации с клиентом по каналу запрещены еще communication_channel[клиент][канал] дней от начала оптимизации
 # После решения этот список перезаписывается в соответствии с корнями для проверки их корректности
-# TODO: для реализации ограничений по МКП по продуктам потребуется аналогичный список communication_product[клиент][продукт]
 
 communications_channel = []
 communications_product = []
@@ -666,7 +667,8 @@ if ask():
     for ch in range(len(channels)):
         print('Total {}: {} ({})'.format(channels[ch], check1[ch],
                                          'Correct' if constraint_absolute_channel[ch][1] <= check1[ch] <=
-                                                      constraint_absolute_channel[ch][2] else '\033[31mIncorrect\033[0m'))
+                                                      constraint_absolute_channel[ch][
+                                                          2] else '\033[31mIncorrect\033[0m'))
 
 print('\n' + 'Step 2: constraints absolute product')
 if ask():
@@ -676,13 +678,14 @@ if ask():
 
     for item in output:
         this_product = item[2]
-        check2[this_product] += int(item[6]) # item[6] - это x
+        check2[this_product] += int(item[6])  # item[6] - это x
 
     for prod in range(len(products)):
         print('Total {}: {} ({})'.format(products[prod], check2[prod],
                                          'Correct' if constraint_absolute_product[prod][1]
                                                       <= check2[prod] <=
-                                                      constraint_absolute_product[prod][2] else '\033[31mIncorrect\033[0m'))
+                                                      constraint_absolute_product[prod][
+                                                          2] else '\033[31mIncorrect\033[0m'))
 
 # check 3: matrix_channel
 
@@ -790,13 +793,16 @@ if ask():
                 break
             else:
                 print(
-                    'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
+                    'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust,
+                                                                                                        channels[ch],
                                                                                                         communications_channel[
                                                                                                             cust][ch],
                                                                                                         '\033[32mOK (x={})\033[0m'.format(
-                                                                                                            output[test_id][
+                                                                                                            output[
+                                                                                                                test_id][
                                                                                                                 6]),
-                                                                                                        test_id, non_zeros))
+                                                                                                        test_id,
+                                                                                                        non_zeros))
 
                 # Если же ограничения не было и коммуникация произошла, добавляем ее в историю оптимизации...
                 opt_hist.append([cust, day, ch, prod])
@@ -806,14 +812,15 @@ if ask():
                         communications_channel[cust][i] = matrix_channel[ch][i]
 
         else:
-            print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
-                                                                                                      communications_channel[
-                                                                                                          cust][
-                                                                                                          ch],
-                                                                                                      '\033[32mOK (x={})\033[0m'.format(
-                                                                                                          output[test_id][
-                                                                                                              6]),
-                                                                                                      test_id, non_zeros))
+            print(
+                'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, channels[ch],
+                                                                                                    communications_channel[
+                                                                                                        cust][
+                                                                                                        ch],
+                                                                                                    '\033[32mOK (x={})\033[0m'.format(
+                                                                                                        output[test_id][
+                                                                                                            6]),
+                                                                                                    test_id, non_zeros))
 
     if check3_flag:
         print('Check 3 is submitted.', check3_info)
@@ -945,13 +952,16 @@ if ask():
                 break
             else:
                 print(
-                    'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, products[prod],
+                    'customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust,
+                                                                                                        products[prod],
                                                                                                         communications_product[
                                                                                                             cust][prod],
                                                                                                         '\033[32mOK (x={})\033[0m'.format(
-                                                                                                            output[test_id][
+                                                                                                            output[
+                                                                                                                test_id][
                                                                                                                 6]),
-                                                                                                        test_id, non_zeros))
+                                                                                                        test_id,
+                                                                                                        non_zeros))
 
                 # Если же ограничения не было и коммуникация произошла, добавляем ее в историю оптимизации...
                 opt_hist.append([cust, day, ch, prod])
@@ -961,14 +971,17 @@ if ask():
                         communications_product[cust][j] = matrix_product[prod][j]
 
         else:
-            print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust, products[prod],
+            print('customer {}, {}, {} days to wait. {}. communication_id = {}, non zeros: {}'.format(cust,
+                                                                                                      products[prod],
                                                                                                       communications_product[
                                                                                                           cust][
                                                                                                           prod],
                                                                                                       '\033[32mOK (x={})\033[0m'.format(
-                                                                                                          output[test_id][
+                                                                                                          output[
+                                                                                                              test_id][
                                                                                                               6]),
-                                                                                                      test_id, non_zeros))
+                                                                                                      test_id,
+                                                                                                      non_zeros))
 
     if check4_flag:
         print('Check 4 is submitted.', check4_info)
@@ -994,7 +1007,6 @@ if ask():
         #         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
         #     print(output[index][6], '(index = {})'.format(index))
 
-
 # check5: constraint ratio channel
 
 print('\n' + 'Step 5: constraint ratio channel')
@@ -1009,7 +1021,9 @@ if ask():
 
     for ch in range(len(channels)):
         print('Ratio for product {}: {} ({})'.format(channels[ch], channel_ratio[ch],
-                                                     'Correct' if constraint_ratio_channel[ch][1] <= channel_ratio[ch] <= constraint_ratio_channel[ch][2] else '\033[31m' + 'Incorrect' + '\033[m'))
+                                                     'Correct' if constraint_ratio_channel[ch][1] <= channel_ratio[
+                                                         ch] <= constraint_ratio_channel[ch][
+                                                                      2] else '\033[31m' + 'Incorrect' + '\033[m'))
 
 # check6: constraint ratio product
 
@@ -1025,7 +1039,9 @@ if ask():
 
     for prod in range(len(products)):
         print('Ratio for product {}: {} ({})'.format(ref_products[prod], product_ratio[prod],
-                                                     'Correct' if constraint_ratio_product[prod][1] <= product_ratio[prod] <= constraint_ratio_product[prod][2] else '\033[31m' + 'Incorrect' + '\033[m'))
+                                                     'Correct' if constraint_ratio_product[prod][1] <= product_ratio[
+                                                         prod] <= constraint_ratio_product[prod][
+                                                                      2] else '\033[31m' + 'Incorrect' + '\033[m'))
 
 # check7: days from start
 
@@ -1037,9 +1053,10 @@ if ask():
             print('Product {}: \033[32mtest is passed\033[0m'.format(ref_products[prod]))
         else:
             for p in range(len(output)):
-                if output[p][2]: # if x[p] - коммуникация по продукту prod
+                if output[p][2]:  # if x[p] - коммуникация по продукту prod
                     if x[p] == 1.0 and output[p][4] < constraint_days_from_start[prod]:
-                        print('Product {}: \033[31mtest failed\033[0m on x[{}] (day {})'.format(ref_products[prod], p, output[p][4]))
+                        print('Product {}: \033[31mtest failed\033[0m on x[{}] (day {})'.format(ref_products[prod], p,
+                                                                                                output[p][4]))
                         check7_flag = False
                         break
 
@@ -1056,7 +1073,8 @@ if ask():
                 # ищем мат.ожидание истинного икса
                 expectation = -1
                 for i in range(len(channels)):
-                    index = i * len(products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
+                    index = i * len(
+                        products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
                     if x[index] == 1.0:
                         expectation = model[i][j][k]
 
@@ -1064,9 +1082,7 @@ if ask():
                 for i in range(len(channel_importance)):
                     index = i * len(
                         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-                    #if model[i][j][k] == expectation and x не приоритетный то тут мои полномочия все, кончились:
-
-
+                    # if model[i][j][k] == expectation and x не приоритетный то тут мои полномочия все, кончились:
 
 # собираем целевую функцию
 objective = 0.0
@@ -1079,10 +1095,6 @@ print("Objective function: {}".format(objective))
 # кривая функция, выводящая только желаемые корни в отформатированном виде
 def print_roots(ch=None, prod=None, cust=None, day=None):
     table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
-    if isinstance(id, list):
-        for item in id:
-            if isinstance(item, int):
-                table.add_row(['?', '?', '?', '?', '?', '?', x[item]])  # TODO: допилить
 
     if isinstance(cust, int):
         for p in range(len(x)):
@@ -1091,9 +1103,9 @@ def print_roots(ch=None, prod=None, cust=None, day=None):
             k = p // period_length % len_customers  # восстанавливаем k по p в одномерном списке переменных
             d = p % period_length
 
-            if i == ch and k == cust and d == day:  # TODO: Если какой-то из аргументов is None, то не включать его в проверку
+            if (i == ch or ch is None) and (j == prod or prod is None) and (k == cust or k is None) and (d == day or d is None):
                 table.add_row([p, i, j, k, d, model[i][j][k], x[p]])
 
     print(table)
 
-# print_roots(ch=0, cust=91, day=0)  # хочу вывести для 91 кастомера - уже не актуально
+print_roots(prod=0, cust=91, day=0)  # хочу вывести для 91 кастомера - уже не актуально
