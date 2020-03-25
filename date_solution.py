@@ -893,7 +893,7 @@ if ask():
                                                                                                     test_id,
                                                                                                     output[test_id][6],
                                                                                                     output[test_id][0])
-                print_communications_product(cust=cust)
+                #print_communications_product(cust=cust)
                 opt_hist.sort(key=itemgetter(1))
                 opt_hist.reverse()
 
@@ -1046,19 +1046,28 @@ if ask():
 # check7: days from start
 
 print('\n' + 'Step 7: days from start')
-check7_flag = True
 if ask():
+    check7_flag = []
+    for j in range(len(products)):
+        check7_flag.append(True)
+
+    for p in range(len(output)):
+
+        i = p // period_length // len_customers // len(products)
+        j = p // period_length // len_customers % len(products)
+        k = p // period_length % len_customers  # восстанавливаем k по p в одномерном списке переменных
+        d = p % period_length
+
+        # if x[p] - успешная коммуникация по продукту prod в запрещенный период
+        if x[p] == 1.0 and d < constraint_days_from_start[j]:
+            print('Product {}: \033[31mtest failed\033[0m on x[{}] (day {})'.format(ref_products[j], p, d))
+            check7_flag[j] = False
+            break
+
     for prod in range(len(products)):
-        if constraint_days_from_start[prod] == 0:
-            print('Product {}: \033[32mtest is passed\033[0m'.format(ref_products[prod]))
-        else:
-            for p in range(len(output)):
-                if output[p][2]:  # if x[p] - коммуникация по продукту prod
-                    if x[p] == 1.0 and output[p][4] < constraint_days_from_start[prod]:
-                        print('Product {}: \033[31mtest failed\033[0m on x[{}] (day {})'.format(ref_products[prod], p,
-                                                                                                output[p][4]))
-                        check7_flag = False
-                        break
+        if check7_flag[prod]:
+            print('Product {}: \033[32mOK\033[0m'.format(ref_products[prod]))
+
 
 # TODO: check8: channel importance
 print('\n' + 'Step 8: channel priority')
@@ -1096,16 +1105,15 @@ print("Objective function: {}".format(objective))
 def print_roots(ch=None, prod=None, cust=None, day=None):
     table = PrettyTable(['p (Ordinal)', 'Channel', 'Product', 'Client', 'Day', 'Expectation', 'x'])
 
-    if isinstance(cust, int):
-        for p in range(len(x)):
-            i = p // period_length // len_customers // len(products)
-            j = p // period_length // len_customers % len(products)
-            k = p // period_length % len_customers  # восстанавливаем k по p в одномерном списке переменных
-            d = p % period_length
+    for p in range(len(x)):
+        i = p // period_length // len_customers // len(products)
+        j = p // period_length // len_customers % len(products)
+        k = p // period_length % len_customers  # восстанавливаем k по p в одномерном списке переменных
+        d = p % period_length
 
-            if (i == ch or ch is None) and (j == prod or prod is None) and (k == cust or k is None) and (d == day or d is None):
-                table.add_row([p, i, j, k, d, model[i][j][k], x[p]])
+        if (i == ch or ch is None) and (j == prod or prod is None) and (k == cust or cust is None) and (d == day or day is None):
+            table.add_row([p, i, j, k, d, model[i][j][k], x[p]])
 
     print(table)
 
-print_roots(prod=0, cust=91, day=0)  # хочу вывести для 91 кастомера - уже не актуально
+print_roots(prod=1, day=0)  # хочу вывести для 91 кастомера - уже не актуально
