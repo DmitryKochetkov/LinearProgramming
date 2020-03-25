@@ -1073,6 +1073,7 @@ if ask():
 print('\n' + 'Step 8: channel priority')
 # надо смотреть наибольшие мат. ожидания по каналам в данный продукт-клиент-день и смотреть, чтобы из них было выбрано нужное)
 if ask():
+    check8_log = []
     for j in range(len(products)):
         for k in range(len_customers):
             for d in range(period_length):
@@ -1087,11 +1088,24 @@ if ask():
                     if x[index] == 1.0:
                         expectation = model[i][j][k]
 
+                # ищем "подходящий канал"
+                match = len(channels)
+                for i in range(len(channels)):
+                    if model[i][j][k] == expectation and channel_importance[i] < match:
+                        match = channel_importance[i]
+                match = channel_importance.index(match)
+
                 # проходимся по каналам в порядке приоритета
                 for i in range(len(channel_importance)):
                     index = i * len(
                         products) * len_customers * period_length + j * len_customers * period_length + k * period_length + d
-                    # if model[i][j][k] == expectation and x не приоритетный то тут мои полномочия все, кончились:
+                    if x[index] == 1.0 and model[i][j][k] == expectation and i != match:
+                        check8_log.append('Test failed for product {}, customer {}, day {}. Channel should be {}'.format(j, k, d, '?'))
+    print('Errors:', len(check8_log))
+    if len(check8_log) == 0:
+        print('Check 8 is submitted.')
+    else:
+        print('Check 8 is not submitted. First error:', check8_log[0])
 
 # собираем целевую функцию
 objective = 0.0
@@ -1116,4 +1130,4 @@ def print_roots(ch=None, prod=None, cust=None, day=None):
 
     print(table)
 
-print_roots(prod=1, day=0)  # хочу вывести для 91 кастомера - уже не актуально
+#print_roots(prod=1, day=0)
