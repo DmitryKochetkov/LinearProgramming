@@ -71,7 +71,7 @@ with open('scores.csv', 'r') as f:
 
     #  если клиентов в scores меньше чем требуется, то генерируем клиентов с случайными model и вероятностью
     if len_customers < desired_clients:
-        for k in range(desired_clients - len_customers, desired_clients):
+        for k in range(len_customers, desired_clients):
             for m in range(len(dict_model)):
                 if randint(0, 10) > 7:
                     scores.append([k, m, round(triangular(min_probability, max_probability), 5)])
@@ -110,7 +110,7 @@ with open('hist.csv', 'r') as f:
 
     if last_surrogate_id > desired_clients:
         for i in range(len(hist)):
-            if hist[i][0] > desired_clients:
+            if hist[i][0] == desired_clients:
                 hist = hist[:i-1]
                 print('Hist truncated')
                 break
