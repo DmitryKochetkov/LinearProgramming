@@ -116,7 +116,7 @@ with open('hist.csv', 'r') as f:
                 break
 
     if last_surrogate_id < desired_clients:
-        for k in range(desired_clients - last_surrogate_id, desired_clients):
+        for k in range(last_surrogate_id, desired_clients):
             for n in range(randint(3, 8)): # генерируем сколько-нибудь коммуникаций от 3 до 8
                 d = randrange((start_date - creation_of_the_world).days - 1) # в дату от "сотворения мира" до начала оптимизации
                 d = start_date + timedelta(days=d, seconds=1)
