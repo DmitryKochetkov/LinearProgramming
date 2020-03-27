@@ -3,11 +3,18 @@ from datetime import datetime, timedelta
 from operator import itemgetter
 
 import numpy as np
+import tracemalloc
 from cvxopt.glpk import ilp
 from cvxopt.modeling import matrix, spmatrix
 from prettytable import PrettyTable
 
 from array_functions import *
+
+# Заводим текстовый файл под статистику
+
+stat = open('./stats/stat' + str(datetime.now()) + '.txt', 'w')
+
+stat.write("Оптимизация" +' \n')
 
 # Чтение данных из csv с конвертацией в нужные типы
 
@@ -57,16 +64,16 @@ with open('hist_generated.csv', 'r') as f:
 
     # ID из истории нормализуются, т.е. сопоставляются с ID в dict_model
 
-    last_id = -1
-    last_surrogate_id = -1
-
-    hist.sort(key=itemgetter(0))
-
-    for item in hist:
-        if item[0] > last_id:
-            last_surrogate_id += 1
-        last_id = item[0]
-        item[0] = last_surrogate_id
+    # last_id = -1
+    # last_surrogate_id = -1
+    #
+    # hist.sort(key=itemgetter(0))
+    #
+    # for item in hist:
+    #     if item[0] > last_id:
+    #         last_surrogate_id += 1
+    #     last_id = item[0]
+    #     item[0] = last_surrogate_id
 
 with open('matrix_channel.csv', 'r') as f:
     reader = csv.reader(f)
@@ -276,7 +283,6 @@ for score in scores:
 
 len_customers += 1
 
-print('\n' + 'CHECKING CLIENTS')
 clients_scores = set()
 clients_hist = set()
 for item in scores:
@@ -285,10 +291,13 @@ for item in scores:
 for item in hist:
     clients_hist.add(item[0])
 
-print('Total clients in Scores:', len(clients_scores))
-print('Total clients in Hist:', len(clients_hist))
+stat.write('Клиентов: {}'.format(len_customers) + '\n')
+stat.write('Total clients in Scores: {}'.format(len(clients_scores)) + '\n')
+stat.write('Total clients in Hist:'.format(len(clients_hist)) + '\n')
 if len(clients_scores.intersection(clients_hist)) == 0:
-    print('Warning: intersection is an empty set')
+    stat.write('Warning: intersection is an empty set' + '\n')
+else:
+    stat.write('Intersection: {}'.format(len(clients_scores.intersection(clients_hist))) + '\n')
 
 # 1. Создаем model как трехмерный список (канал-продукт-клиент)
 model = []
@@ -311,15 +320,6 @@ for score in scores:
     this_product = product_by_model(this_model)
 
     model[this_channel][this_product][this_client] = -this_probability * products[this_product][2]
-
-# # 3. Удаляем из истории данные о клиентах, отсутствующих в модели (часть нормализации ID клиентов)
-#
-# normalized_len = 0
-# for i in range(len(hist)):
-#     if hist[i][0] == len_customers - 1 and hist[i + 1][0] == len_customers:
-#         normalized_len = i
-#
-# hist = hist[:normalized_len]
 
 # Сортируем историю в хронологическом порядке (по датам)
 hist.sort(key=itemgetter(1))
@@ -424,6 +424,8 @@ for k in range(len(communications_channel)):
 
 # РЕШЕНИЕ
 
+print("Собираем ограничения")
+
 output = []  # отдельный двумерный список для красивого вывода, каждая его строка помещается в красивую табличку
 
 # неравенство-ограничение имеет вид G*x <= h, уравнение-ограничение имеет вид A*x <= b
@@ -443,14 +445,23 @@ b = []  # матрица свободных членов уравнения-ог
 
 # целевая функция (порядок иксов ijkd: 0000, 0001, 0002, ..., 000_30, 001_0 etc...)
 
+start_time = datetime.now()
+tracemalloc.start()
 for p in range(len(model_1d)):
     for d in range(period_length):
         i, j, k = ijk(model, p)  # i - channel, j - product, k - customer, d - day
         c.append(model_1d[p])
         output.append([p * period_length + d, i, j, k, d, model_1d[p], '?'])
 
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+stat.write("Целевая функция собрана за " + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
+
 # ограничения на общее количество коммуникаций по каналу сверху
 
+start_time = datetime.now()
+tracemalloc.start()
 for i in range(len(channels)):
     G_x.extend(np.ones(len(products) * len_customers * period_length, dtype=float).tolist())
     a = range(i * len(products) * len_customers * period_length,
@@ -464,7 +475,15 @@ for i in range(len(channels)):
 for constraint in constraint_absolute_channel:
     h.append(constraint[2])
 
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+stat.write("Ограничение на общее количество коммуникаций по каналу собрано за " + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
+
 # ограничения из истории
+
+start_time = datetime.now()
+tracemalloc.start()
 
 A = np.zeros(len(channels) * len(products) * len_customers * period_length, dtype=float).tolist()
 for i in range(len(channels)):
@@ -478,11 +497,19 @@ for i in range(len(channels)):
 
 b = [0.0]
 
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+stat.write("Ограничения из истории коммуникаций собраны за " + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
+
 # ограничения из МКП по каналам
 # TODO: выставить приоритет каналов (по идее это должно быть здесь же, а не отдельным неравенством)
 # может надо всего-то range(len(channels)) заменить на range(channel_importance)? хотя порядок вряд ли так сильно влияет
 # а еще можно добавлять мат.ожидания как коэффициенты в неравенстве!!!
 # типа model * x_i0j0k91d0 + model * x_i1j0k91d0 + model * x_i2j0k91d0 + model * x_i3j0k91d0 < что-то там
+
+start_time = datetime.now()
+tracemalloc.start()
 
 neq = G_i[-1] + 1  # номер последней строки матрицы коэффициентов неравенства
 for k in range(len_customers):
@@ -513,7 +540,15 @@ for k in range(len_customers):
         h.append(1.0)
         neq += 1
 
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+stat.write("Ограничения по МКП каналов собраны за " + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
+
 # ограничения из МКП по продуктам
+start_time = datetime.now()
+tracemalloc.start()
+
 for k in range(len_customers):
     for d in range(period_length):
 
@@ -541,6 +576,11 @@ for k in range(len_customers):
         G_j.extend(inequality_j)
         h.append(1.0)
         neq += 1
+
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+stat.write("Ограничения по МКП продуктов собраны за " + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
 
 # ограничения на долю продукта снизу
 # TODO: раскомментировать
@@ -580,10 +620,6 @@ for i in range(len(channels)):
                 if d < constraint_days_from_start[j]:
                     A[index] = 1.0
 
-print(len(G_x))
-print(len(G_i))
-print(len(G_j))
-
 B = set(range(len(c)))
 
 c = matrix(c)
@@ -592,14 +628,20 @@ h = matrix(h)
 A = matrix(A).trans()
 b = matrix(b)
 
-print('Sizes')
-print('c: ', c.size)
-print('G: ', G.size)
-print('h: ', h.size)
-print('A: ', A.size)
-print('b: ', b.size)
+stat.write('Размерности матриц:' + '\n')
+stat.write('c: ' + str(c.size) + '\n')
+stat.write('G: ' + str(G.size) + '\n')
+stat.write('h: ' + str(h.size) + '\n')
+stat.write('A: ' + str(A.size) + '\n')
+stat.write('b: ' + str(b.size) + '\n')
 
+start_time = datetime.now()
+tracemalloc.start()
 status, x = ilp(c, G, h, A, b, set(), B)
+current, peak = tracemalloc.get_traced_memory()
+stat.write('Оптимизация завершена за ' + str(datetime.now() - start_time) + '\n')
+stat.write('Current: {} КB, peak: {} КB'.format(current / 1024, peak / 1024) + '\n')
+tracemalloc.stop()
 
 # Output
 
@@ -1045,6 +1087,7 @@ if ask():
 
 
 # check8: channel importance
+# TODO: проверить правильность проверки
 print('\n' + 'Step 8: channel priority')
 # надо смотреть наибольшие мат. ожидания по каналам в данный продукт-клиент-день и смотреть, чтобы из них было выбрано нужное)
 if ask():
@@ -1089,6 +1132,7 @@ for item in output:
 
 print("Objective function: {}".format(objective))
 
+stat.close()
 
 # кривая функция, выводящая только желаемые корни в отформатированном виде
 def print_roots(ch=None, prod=None, cust=None, day=None):
